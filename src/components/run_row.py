@@ -40,7 +40,7 @@ def create_run_row(run_name, tags, timestamp, annotation=None, run_index=0):
         annotation_icon = '<div class="w-5 h-5 rounded-full border-2 border-gray-300 bg-white flex-shrink-0"></div>'
 
     return f"""
-    <div class="border-b border-gray-100 px-6 py-4 hover:bg-gray-50">
+    <div class="border-b border-gray-100 px-6 py-4 hover:bg-gray-50 cursor-pointer">
         <div class="flex items-center justify-between">
             <div class="flex items-center space-x-3">
                 <input type="checkbox" id="rowCheckbox_{run_index}" class="row-checkbox w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" onchange="updateSelectedCount()">
@@ -56,6 +56,9 @@ def create_run_row(run_name, tags, timestamp, annotation=None, run_index=0):
                     {annotation_icon}
                 </div>
                 <span class="text-sm text-gray-500">{timestamp}</span>
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
             </div>
         </div>
     </div>

@@ -101,7 +101,7 @@ def queues_page(request):
                         }}
                         
                         runsHtml += `
-                            <div class="border-b border-gray-100 px-6 py-4 hover:bg-gray-50">
+                            <div class="border-b border-gray-100 px-6 py-4 hover:bg-gray-50 cursor-pointer">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center space-x-3 flex-1">
                                         ${{annotationIcon}}
@@ -109,8 +109,13 @@ def queues_page(request):
                                             <div class="text-sm font-medium text-gray-900">${{run.name}}</div>
                                         </div>
                                     </div>
-                                    <div class="text-sm text-gray-600 ml-4">
-                                        ${{run.timestamp}}
+                                    <div class="flex items-center space-x-4">
+                                        <div class="text-sm text-gray-600">
+                                            ${{run.timestamp}}
+                                        </div>
+                                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                        </svg>
                                     </div>
                                 </div>
                             </div>

@@ -79,6 +79,26 @@ def queues_page(request, app_data):
         <div class="flex">
             <!-- Queues Sidebar -->
             <div class="w-80 bg-white border-r border-gray-200 h-screen overflow-y-auto">
+                <!-- Annotator Filter -->
+                <div class="p-4 border-b border-gray-200">
+                    <div class="relative">
+                        <div class="text-sm text-gray-500 mb-2">Annotator</div>
+                        <button onclick="toggleAnnotatorFilter()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium border border-gray-300 flex items-center space-x-2">
+                            <span id="currentAnnotator">{user}</span>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div id="annotatorFilterDropdown" class="absolute left-0 mt-2 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-10 hidden">
+                            <div class="py-1">
+                                <button onclick="filterByAnnotator('Aman')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Aman</button>
+                                <button onclick="filterByAnnotator('Piyush')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Piyush</button>
+                                <button onclick="filterByAnnotator('Gayathri')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Gayathri</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Queue Items -->
                 <div>
                     {queues_html}
@@ -104,7 +124,7 @@ def queues_page(request, app_data):
         {queues_script}
         <script>
             // Initialize queues data
-            initializeQueuesData({queues_json});
+            initializeQueuesData({json.dumps({"queues": queues, "user": user})});
         </script>
     </body>
     </html>

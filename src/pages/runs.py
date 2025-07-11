@@ -83,7 +83,7 @@ def runs_page(request, app_data):
                             <input type="checkbox" id="selectAllCheckbox" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" onchange="toggleSelectAll()">
                             <span id="selectedCount" class="text-sm text-gray-500 hidden"></span>
                         </div>
-                        <div class="flex items-center space-x-8">
+                        <div class="flex items-center space-x-10">
                             <div class="flex items-center justify-center w-12">
                                 <span class="text-sm text-gray-500">Status</span>
                             </div>

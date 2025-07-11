@@ -1,4 +1,5 @@
 let queuesData = [];
+let currentUser = '';
 
 // Helper function to format ISO timestamp to human readable format
 function formatTimestamp(isoTimestamp) {
@@ -75,9 +76,10 @@ function getAnnotationStatus(run) {
         return null; // No annotation
     }
     
-    // Check each annotator's judgement
-    for (const [annotator, annotationData] of Object.entries(run.annotations)) {
-        const judgement = annotationData.judgement;
+    // Only check annotations from the currently selected annotator
+    const annotation_data = run.annotations[currentUser];
+    if (annotation_data && annotation_data.judgement) {
+        const judgement = annotation_data.judgement;
         if (judgement === 'correct' || judgement === 'wrong') {
             return judgement;
         }
@@ -229,7 +231,7 @@ function showQueueDetails(queueId) {
             <!-- Header -->
             <div class="bg-white border-b border-t border-gray-200 px-6 py-4">
                 <div class="flex justify-between items-center">
-                    <div class="flex items-center space-x-4">
+                    <div class="flex flex-col">
                         <h2 class="text-lg font-semibold text-gray-900">${queue.name} (${runs.length})</h2>
                         <span class="text-sm text-gray-500">Created by ${queue.created_by}</span>
                     </div>
@@ -316,13 +318,49 @@ function toggleDropdown() {
     dropdown.classList.toggle('hidden');
 }
 
+// Initialize queues data
+function initializeQueuesData(data) {
+    // Handle both old format (array) and new format (object with queues and user)
+    if (Array.isArray(data)) {
+        queuesData = data;
+    } else {
+        queuesData = data.queues || [];
+        currentUser = data.user || '';
+    }
+}
+
+// Annotator filter functions
+function toggleAnnotatorFilter() {
+    const dropdown = document.getElementById('annotatorFilterDropdown');
+    dropdown.classList.toggle('hidden');
+}
+
+function filterByAnnotator(annotator) {
+    currentUser = annotator;
+    document.getElementById('currentAnnotator').textContent = annotator;
+    document.getElementById('annotatorFilterDropdown').classList.add('hidden');
+    
+    // Re-render the current queue details if one is selected
+    const mainContent = document.getElementById('mainContent');
+    if (mainContent.innerHTML.includes('runsList-')) {
+        // Extract queue ID from the current display
+        const runsListElement = document.querySelector('[id^="runsList-"]');
+        if (runsListElement) {
+            const queueId = runsListElement.id.replace('runsList-', '');
+            showQueueDetails(queueId);
+        }
+    }
+}
+
 // Close dropdown when clicking outside
 document.addEventListener('click', function(event) {
     const dropdown = document.getElementById('dropdown');
-    const button = event.target.closest('button');
-    
-    if (!button || button.getAttribute('onclick') !== 'toggleDropdown()') {
-        dropdown.classList.add('hidden');
+    if (dropdown) {
+        const button = event.target.closest('button');
+        
+        if (!button || button.getAttribute('onclick') !== 'toggleDropdown()') {
+            dropdown.classList.add('hidden');
+        }
     }
     
     // Close annotation filter dropdown when clicking outside
@@ -335,9 +373,15 @@ document.addEventListener('click', function(event) {
             }
         }
     });
-});
-
-// Initialize queues data
-function initializeQueuesData(data) {
-    queuesData = data;
-} 
+    
+    // Close annotator filter dropdown when clicking outside
+    const annotatorFilterDropdown = document.getElementById('annotatorFilterDropdown');
+    if (annotatorFilterDropdown) {
+        if (!event.target.closest('#annotatorFilterDropdown')) {
+            const toggleButton = event.target.closest('button[onclick="toggleAnnotatorFilter()"]');
+            if (!toggleButton) {
+                annotatorFilterDropdown.classList.add('hidden');
+            }
+        }
+    }
+}); 

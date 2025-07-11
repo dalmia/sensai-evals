@@ -17,9 +17,13 @@ def runs_page(request):
     runs_html = "".join(
         [
             create_run_row(
-                run["name"], run["tags"], run["uploaded_by"], run["timestamp"]
+                run["name"],
+                run["tags"],
+                run["timestamp"],
+                run.get("annotation", None),
+                index,
             )
-            for run in runs
+            for index, run in enumerate(runs)
         ]
     )
 
@@ -56,9 +60,13 @@ def runs_page(request):
                 <div class="bg-white border-b border-gray-200 px-6 py-3">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-2">
+                            <input type="checkbox" id="selectAllCheckbox" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" onchange="toggleSelectAll()">
+                            <span id="selectedCount" class="text-sm text-gray-500 hidden"></span>
                         </div>
                         <div class="flex items-center space-x-8">
-                            <span class="text-sm text-gray-500">Uploaded by</span>
+                            <div class="flex items-center justify-center w-12">
+                                <span class="text-sm text-gray-500">Status</span>
+                            </div>
                             <span class="text-sm text-gray-500">Timestamp ↓</span>
                         </div>
                     </div>
@@ -75,6 +83,49 @@ def runs_page(request):
             function toggleDropdown() {{
                 const dropdown = document.getElementById('dropdown');
                 dropdown.classList.toggle('hidden');
+            }}
+            
+            // Select/Deselect all functionality
+            function toggleSelectAll() {{
+                const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+                const rowCheckboxes = document.querySelectorAll('.row-checkbox');
+                
+                rowCheckboxes.forEach(function(checkbox) {{
+                    checkbox.checked = selectAllCheckbox.checked;
+                }});
+                
+                updateSelectedCount();
+            }}
+            
+            // Update selected count display
+            function updateSelectedCount() {{
+                const rowCheckboxes = document.querySelectorAll('.row-checkbox');
+                const selectedCheckboxes = document.querySelectorAll('.row-checkbox:checked');
+                const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+                const selectedCountElement = document.getElementById('selectedCount');
+                
+                const selectedCount = selectedCheckboxes.length;
+                const totalCount = rowCheckboxes.length;
+                
+                // Update select all checkbox state
+                if (selectedCount === 0) {{
+                    selectAllCheckbox.checked = false;
+                    selectAllCheckbox.indeterminate = false;
+                }} else if (selectedCount === totalCount) {{
+                    selectAllCheckbox.checked = true;
+                    selectAllCheckbox.indeterminate = false;
+                }} else {{
+                    selectAllCheckbox.checked = false;
+                    selectAllCheckbox.indeterminate = true;
+                }}
+                
+                // Update count display
+                if (selectedCount > 0) {{
+                    selectedCountElement.textContent = selectedCount + ' selected';
+                    selectedCountElement.classList.remove('hidden');
+                }} else {{
+                    selectedCountElement.classList.add('hidden');
+                }}
             }}
             
             // Close dropdown when clicking outside

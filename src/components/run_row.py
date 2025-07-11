@@ -1,4 +1,4 @@
-def create_run_row(run_name, tags, uploaded_by, timestamp):
+def create_run_row(run_name, tags, timestamp, annotation=None, run_index=0):
     """Create a reusable run row component"""
     # Create tag badges
     tag_badges = []
@@ -22,11 +22,28 @@ def create_run_row(run_name, tags, uploaded_by, timestamp):
 
     tags_html = " ".join(tag_badges)
 
+    # Create annotation icon
+    annotation_icon = ""
+    if annotation == "correct":
+        annotation_icon = """<div class="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+            <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+        </div>"""
+    elif annotation == "wrong":
+        annotation_icon = """<div class="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
+            <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </div>"""
+    else:
+        annotation_icon = '<div class="w-5 h-5 rounded-full border-2 border-gray-300 bg-white flex-shrink-0"></div>'
+
     return f"""
     <div class="border-b border-gray-100 px-6 py-4 hover:bg-gray-50">
         <div class="flex items-center justify-between">
             <div class="flex items-center space-x-3">
-                <input type="checkbox" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                <input type="checkbox" id="rowCheckbox_{run_index}" class="row-checkbox w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" onchange="updateSelectedCount()">
                 <div>
                     <div class="text-sm font-medium text-gray-900">{run_name}</div>
                     <div class="flex items-center space-x-2 mt-1">
@@ -35,7 +52,9 @@ def create_run_row(run_name, tags, uploaded_by, timestamp):
                 </div>
             </div>
             <div class="flex items-center space-x-8">
-                <span class="text-sm text-gray-500">{uploaded_by}</span>
+                <div class="flex items-center justify-center w-12">
+                    {annotation_icon}
+                </div>
                 <span class="text-sm text-gray-500">{timestamp}</span>
             </div>
         </div>

@@ -4,8 +4,9 @@ from starlette.responses import RedirectResponse
 
 # Import modularized components
 from auth import VALID_USERS, get_current_user
-from runs import runs_page
-from queues import queues_page
+from pages.runs import runs_page
+from pages.queues import queues_page
+from pages.queue import individual_queue_page
 
 # Create FastHTML app with session middleware and Tailwind CSS
 app = FastHTML(
@@ -27,6 +28,12 @@ def home(request):
 def queues(request):
     """Queues page route - delegates to queues page"""
     return queues_page(request)
+
+
+@app.get("/queues/{queue_id}")
+def queue_detail(request, queue_id: str):
+    """Individual queue page route - delegates to individual queue page"""
+    return individual_queue_page(request, queue_id)
 
 
 @app.get("/login")

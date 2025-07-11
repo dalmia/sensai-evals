@@ -22,7 +22,7 @@ def create_header(user, active_tab="runs"):
                     <!-- Navigation Tabs -->
                     <div class="flex space-x-8">
                         <a href="/" class="{runs_class}">Runs</a>
-                        <a href="/queues" class="{queues_class}">Annotation Queues (10)</a>
+                        <a href="/queues" class="{queues_class}">Annotation Queues</a>
                     </div>
                 </div>
                 

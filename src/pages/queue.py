@@ -1,6 +1,7 @@
 from auth import require_auth, get_current_user
 from components.header import create_header
 from components.queue_run_row import create_simple_queue_run_row
+from fasthtml.common import ScriptX
 import json
 
 
@@ -14,9 +15,6 @@ def individual_queue_page(request, queue_id, app_data):
 
     # Use queues data from session (fallback to empty list if not available)
     queues = app_data.get("queues", [])
-
-    # For now, use empty queue_runs until we have that data structure from API
-    queue_runs = {}
 
     # Find the queue by ID
     queue = next((q for q in queues if q["id"] == queue_id), None)
@@ -43,19 +41,56 @@ def individual_queue_page(request, queue_id, app_data):
         </html>
         """
 
-    # Get runs for this queue
-    runs = queue_runs.get(queue_id, [])
+    # Get runs directly from queue.runs (new data structure)
+    runs = queue.get("runs", [])
+
+    # Helper function to get annotation status from run data
+    def get_annotation_status(run):
+        if not run.get("annotations"):
+            return None
+
+        # Only check annotations from the logged-in user
+        annotation_data = run["annotations"].get(user)
+        if annotation_data and annotation_data.get("judgement"):
+            judgement = annotation_data.get("judgement")
+            if judgement in ["correct", "wrong"]:
+                return judgement
+
+        return None
+
+    # Helper function to create run name from metadata
+    def get_run_name(run):
+        metadata = run.get("metadata", {})
+        run_id = run.get("id", "unknown")
+        course_name = metadata.get("course", {}).get("name", "")
+        milestone_name = metadata.get("milestone", {}).get("name", "")
+        org_name = metadata.get("org", {}).get("name", "")
+
+        if course_name and milestone_name:
+            run_name = f"{course_name} - {milestone_name}"
+        elif course_name:
+            run_name = course_name
+        else:
+            run_name = f"Run {run_id}"
+
+        if org_name:
+            run_name = f"{run_name} ({org_name})"
+
+        return run_name
 
     # Generate queue runs using simplified component
     queue_runs_html = "".join(
         [
             create_simple_queue_run_row(
-                run["name"],
-                run.get("annotation", None),
+                get_run_name(run),
+                get_annotation_status(run),
             )
             for run in runs
         ]
     )
+
+    # Import the JavaScript for individual queue functionality
+    queue_script = ScriptX("js/queue.js")
 
     return f"""
     <!DOCTYPE html>
@@ -83,7 +118,7 @@ def individual_queue_page(request, queue_id, app_data):
                         <div class="relative">
                             <div class="text-sm text-gray-500 mb-2">Annotator</div>
                             <button onclick="toggleAnnotatorFilter()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium border border-gray-300 flex items-center space-x-2">
-                                <span id="currentAnnotator">Aman</span>
+                                <span id="currentAnnotator">{user}</span>
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                 </svg>
@@ -156,212 +191,10 @@ def individual_queue_page(request, queue_id, app_data):
             </div>
         </div>
         
+        {queue_script}
         <script>
-            // Queue runs data
-            const runs = {json.dumps(runs)};
-            let currentSort = {{'by': 'timestamp', 'order': 'desc'}};
-            let currentFilter = 'all';
-            
-            console.log('Runs data:', runs);
-            console.log('Initial sort:', currentSort);
-            
-            // Function to filter runs by annotation status
-            function filterRuns(runs, filter) {{
-                console.log('Filtering runs by:', filter);
-                if (filter === 'all') return runs;
-                if (filter === 'empty') return runs.filter(function(run) {{ return run.annotation === null || run.annotation === undefined; }});
-                if (filter === 'correct') return runs.filter(function(run) {{ return run.annotation === 'correct'; }});
-                if (filter === 'wrong') return runs.filter(function(run) {{ return run.annotation === 'wrong'; }});
-                return runs;
-            }}
-            
-            // Function to get filtered and sorted runs
-            function getFilteredAndSortedRuns() {{
-                let filteredRuns = filterRuns(runs, currentFilter);
-                console.log('Filtered runs:', filteredRuns);
-                let sortedRuns = sortRuns(filteredRuns, currentSort.by, currentSort.order);
-                console.log('Sorted runs:', sortedRuns);
-                return sortedRuns;
-            }}
-            
-            // Function to update the runs display and queue count
-            function updateRunsDisplay() {{
-                console.log('Updating runs display');
-                const displayRuns = getFilteredAndSortedRuns();
-                document.getElementById('runsList').innerHTML = generateRunsHTML(displayRuns);
-                
-                // Update queue count in header
-                const queueHeader = document.querySelector('h2');
-                const queueName = queueHeader.textContent.split(' (')[0];
-                const countText = displayRuns.length !== runs.length ? 
-                    displayRuns.length + ' of ' + runs.length : 
-                    displayRuns.length;
-                queueHeader.textContent = queueName + ' (' + countText + ')';
-                console.log('Updated header to:', queueHeader.textContent);
-            }}
-            
-            // Generate runs HTML
-            function generateRunsHTML(sortedRuns) {{
-                console.log('Generating HTML for runs:', sortedRuns);
-                let runsHtml = '';
-                for (let i = 0; i < sortedRuns.length; i++) {{
-                    const run = sortedRuns[i];
-                    
-                    // Annotation icon
-                    let annotationIcon = '';
-                    if (run.annotation === 'correct') {{
-                        annotationIcon = '<div class="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">' +
-                          '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-                            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />' +
-                          '</svg>' +
-                        '</div>';
-                    }} else if (run.annotation === 'wrong') {{
-                        annotationIcon = '<div class="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">' +
-                          '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-                            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />' +
-                          '</svg>' +
-                        '</div>';
-                    }} else {{
-                        annotationIcon = '<div class="w-5 h-5 rounded-full border-2 border-gray-300 bg-white flex-shrink-0"></div>';
-                    }}
-                    
-                    runsHtml += '<div class="border-b border-gray-100 px-6 py-4 hover:bg-gray-50 cursor-pointer">' +
-                        '<div class="flex items-center justify-between">' +
-                            '<div class="flex items-center space-x-3 flex-1">' +
-                                annotationIcon +
-                                '<div class="flex-1">' +
-                                    '<div class="text-sm font-medium text-gray-900">' + run.name + '</div>' +
-                                    '<div class="text-xs text-gray-500 mt-1">' + run.timestamp + '</div>' +
-                                '</div>' +
-                            '</div>' +
-                            '<svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-                                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />' +
-                            '</svg>' +
-                        '</div>' +
-                    '</div>';
-                }}
-                console.log('Generated HTML length:', runsHtml.length);
-                return runsHtml;
-            }}
-            
-            // Sorting function
-            function sortRuns(runs, sortBy, sortOrder) {{
-                console.log('Sorting runs by:', sortBy, sortOrder);
-                return runs.slice().sort(function(a, b) {{
-                    let aValue, bValue;
-                    
-                    if (sortBy === 'timestamp') {{
-                        // Parse timestamp format: "06/21/2025, 20:58"
-                        aValue = new Date(a.timestamp.replace(',', ''));
-                        bValue = new Date(b.timestamp.replace(',', ''));
-                        console.log('Comparing timestamps:', a.timestamp, 'vs', b.timestamp);
-                    }}
-                    
-                    if (sortOrder === 'asc') {{
-                        return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-                    }} else {{
-                        return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-                    }}
-                }});
-            }}
-            
-            // Update arrow based on sort direction
-            function updateArrow() {{
-                const arrowElement = document.getElementById('timestampArrow');
-                if (currentSort.order === 'asc') {{
-                    arrowElement.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>' +
-                    '</svg>';
-                }} else {{
-                    arrowElement.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>' +
-                    '</svg>';
-                }}
-            }}
-            
-            // Toggle timestamp sort
-            function toggleTimestampSort() {{
-                console.log('Toggling timestamp sort');
-                currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc';
-                updateRunsDisplay();
-                updateArrow();
-            }}
-            
-            // Toggle annotation filter dropdown
-            function toggleAnnotationFilter() {{
-                console.log('Toggling annotation filter');
-                const dropdown = document.getElementById('annotationFilterDropdown');
-                dropdown.classList.toggle('hidden');
-            }}
-            
-            // Toggle annotator filter dropdown
-            function toggleAnnotatorFilter() {{
-                console.log('Toggling annotator filter');
-                const dropdown = document.getElementById('annotatorFilterDropdown');
-                dropdown.classList.toggle('hidden');
-            }}
-            
-            // Filter by annotation status
-            function filterByAnnotation(filter) {{
-                console.log('Filtering by annotation:', filter);
-                currentFilter = filter;
-                const filterLabels = {{
-                    'all': 'All',
-                    'empty': 'Not Annotated',
-                    'correct': 'Correct',
-                    'wrong': 'Wrong'
-                }};
-                document.getElementById('currentFilter').textContent = filterLabels[filter];
-                document.getElementById('annotationFilterDropdown').classList.add('hidden');
-                updateRunsDisplay();
-            }}
-            
-            // Filter by annotator
-            function filterByAnnotator(annotator) {{
-                console.log('Filtering by annotator:', annotator);
-                document.getElementById('currentAnnotator').textContent = annotator;
-                document.getElementById('annotatorFilterDropdown').classList.add('hidden');
-                // Add annotator filtering logic here if needed
-            }}
-            
-            // Initialize with sorted and filtered runs
-            document.addEventListener('DOMContentLoaded', function() {{
-                console.log('DOM loaded, initializing...');
-                updateRunsDisplay();
-            }});
-            
-            function toggleDropdown() {{
-                const dropdown = document.getElementById('dropdown');
-                dropdown.classList.toggle('hidden');
-            }}
-            
-            // Close dropdown when clicking outside
-            document.addEventListener('click', function(event) {{
-                const dropdown = document.getElementById('dropdown');
-                const button = event.target.closest('button');
-                
-                if (!button || button.getAttribute('onclick') !== 'toggleDropdown()') {{
-                    dropdown.classList.add('hidden');
-                }}
-                
-                // Close annotation filter dropdown when clicking outside
-                const annotationFilterDropdown = document.getElementById('annotationFilterDropdown');
-                if (annotationFilterDropdown && !event.target.closest('#annotationFilterDropdown')) {{
-                    const toggleButton = event.target.closest('button[onclick="toggleAnnotationFilter()"]');
-                    if (!toggleButton) {{
-                        annotationFilterDropdown.classList.add('hidden');
-                    }}
-                }}
-                
-                // Close annotator filter dropdown when clicking outside
-                const annotatorFilterDropdown = document.getElementById('annotatorFilterDropdown');
-                if (annotatorFilterDropdown && !event.target.closest('#annotatorFilterDropdown')) {{
-                    const toggleButton = event.target.closest('button[onclick="toggleAnnotatorFilter()"]');
-                    if (!toggleButton) {{
-                        annotatorFilterDropdown.classList.add('hidden');
-                    }}
-                }}
-            }});
+            // Initialize queue data
+            initializeQueueData({json.dumps({"queue": queue, "runs": runs, "user": user})});
         </script>
     </body>
     </html>

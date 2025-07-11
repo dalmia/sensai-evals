@@ -1,2 +1,4 @@
 python-fasthtml
 uvicorn
+python-dotenv
+boto3

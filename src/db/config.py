@@ -13,3 +13,9 @@ if not exists(data_root_dir):
 
 
 sqlite_db_path = f"{data_root_dir}/db.evals.sqlite"
+
+runs_table_name = "runs"
+queues_table_name = "queues"
+annotations_table_name = "annotations"
+users_table_name = "users"
+queue_runs_table_name = "queue_runs"

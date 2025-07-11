@@ -2,17 +2,34 @@ from auth import require_auth, get_current_user
 from components.header import create_header
 from components.queue_item import create_queue_item
 from components.queue_run_row import create_queue_run_row
-from data import queues, queue_runs, annotators
 import json
 
 
-def queues_page(request):
+def queues_page(request, app_data):
     """Protected annotation queues page"""
     auth_redirect = require_auth(request)
     if auth_redirect:
         return auth_redirect
 
     user = get_current_user(request)
+
+    # Use queues data from session (fallback to empty list if not available)
+    queues = app_data.get("queues", [])
+
+    # For now, use empty queue_runs until we have that data structure from API
+    queue_runs = {}
+
+    # Sample annotators data (this should ideally come from the API too)
+    annotators = [
+        "Aman",
+        "Piyush",
+        "Gayathri",
+        "Priya",
+        "Rahul",
+        "Sneha",
+        "Vikram",
+        "Ananya",
+    ]
 
     # Generate all queue items
     queues_html = "".join(

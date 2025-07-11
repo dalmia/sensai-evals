@@ -1,17 +1,22 @@
 from auth import require_auth, get_current_user
 from components.header import create_header
 from components.queue_run_row import create_simple_queue_run_row
-from data import queues, queue_runs
 import json
 
 
-def individual_queue_page(request, queue_id):
+def individual_queue_page(request, queue_id, app_data):
     """Protected individual queue page"""
     auth_redirect = require_auth(request)
     if auth_redirect:
         return auth_redirect
 
     user = get_current_user(request)
+
+    # Use queues data from session (fallback to empty list if not available)
+    queues = app_data.get("queues", [])
+
+    # For now, use empty queue_runs until we have that data structure from API
+    queue_runs = {}
 
     # Find the queue by ID
     queue = next((q for q in queues if q["id"] == queue_id), None)

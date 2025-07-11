@@ -7,33 +7,124 @@ from auth import VALID_USERS, get_current_user
 from pages.runs import runs_page
 from pages.queues import queues_page
 from pages.queue import individual_queue_page
+from dotenv import load_dotenv
+from utils import download_file_from_s3_as_bytes
+import json
+import os
+
+load_dotenv()
+
+# Global variable to store app data
+app_data = None
 
 # Create FastHTML app with session middleware and Tailwind CSS
-app = FastHTML(
+app, rt = fast_app(
     hdrs=(
         # Add Tailwind CSS via CDN
         Link(rel="stylesheet", href="https://cdn.tailwindcss.com"),
-    )
+    ),
+    static_path="public",  # This serves static files from the src/public directory
 )
 app.add_middleware(SessionMiddleware, secret_key="your-secret-key-here")
 
 
 @app.get("/")
 def home(request):
-    """Home page route - delegates to runs page"""
-    return runs_page(request)
+    """Home page route - shows spinner and loads data before delegating to runs page"""
+    from auth import require_auth, get_current_user
+    from components.header import create_header
+
+    auth_redirect = require_auth(request)
+    if auth_redirect:
+        return auth_redirect
+
+    user = get_current_user(request)
+
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>SensAI evals | Home</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-gray-100 min-h-screen">
+        {create_header(user, "runs")}
+        
+        <!-- Loading Spinner -->
+        <div id="loadingSpinner" class="flex items-center justify-center min-h-screen">
+            <div class="text-center">
+                <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p class="text-gray-600 text-lg">Loading data...</p>
+            </div>
+        </div>
+        
+        <script>
+            // Load data on page load
+            window.addEventListener('DOMContentLoaded', function() {{
+                fetch('/api/data')
+                    .then(response => response.json())
+                    .then(data => {{
+                        if (data.error) {{
+                            console.error('Error loading data:', data.error);
+                            document.getElementById('loadingSpinner').innerHTML = `
+                                <div class="text-center">
+                                    <div class="text-red-500 text-xl mb-4">⚠️</div>
+                                    <p class="text-red-600 text-lg">Error loading data</p>
+                                    <p class="text-gray-600">${{data.error}}</p>
+                                </div>
+                            `;
+                            return;
+                        }}
+                        
+                        // Data loaded successfully, now navigate to runs page
+                        window.location.href = '/runs';
+                    }})
+                    .catch(error => {{
+                        console.error('Error:', error);
+                        document.getElementById('loadingSpinner').innerHTML = `
+                            <div class="text-center">
+                                <div class="text-red-500 text-xl mb-4">⚠️</div>
+                                <p class="text-red-600 text-lg">Network error</p>
+                                <p class="text-gray-600">Please check your connection and try again</p>
+                            </div>
+                        `;
+                    }});
+            }});
+        </script>
+    </body>
+    </html>
+    """
+
+
+@app.get("/runs")
+def runs(request):
+    """Runs page route - delegates to runs page with server-side data"""
+    global app_data
+    if not app_data:
+        # If no data loaded, redirect to home to load data
+        return RedirectResponse(url="/", status_code=302)
+
+    return runs_page(request, app_data)
 
 
 @app.get("/queues")
 def queues(request):
-    """Queues page route - delegates to queues page"""
-    return queues_page(request)
+    """Queues page route - delegates to queues page with server-side data"""
+    global app_data
+    if not app_data:
+        # If no data loaded, redirect to home to load data
+        return RedirectResponse(url="/", status_code=302)
+    return queues_page(request, app_data)
 
 
 @app.get("/queues/{queue_id}")
 def queue_detail(request, queue_id: str):
-    """Individual queue page route - delegates to individual queue page"""
-    return individual_queue_page(request, queue_id)
+    """Individual queue page route - delegates to individual queue page with server-side data"""
+    global app_data
+    if not app_data:
+        # If no data loaded, redirect to home to load data
+        return RedirectResponse(url="/", status_code=302)
+    return individual_queue_page(request, queue_id, app_data)
 
 
 @app.get("/login")
@@ -112,6 +203,44 @@ def logout(request):
     """Logout and clear session"""
     request.session.clear()
     return RedirectResponse(url="/login", status_code=302)
+
+
+from fastcore.xtras import timed_cache
+
+
+# @timed_cache(seconds=3600)
+def get_app_data():
+    """Fetch data from S3 - both queues and conversations"""
+    env = os.getenv("ENV")
+    if not env:
+        return {"error": "ENV environment variable not set"}
+
+    # Fetch queues data
+    queues_key = f"{env}/evals/queues_dummy.json"
+    queues_bytes = download_file_from_s3_as_bytes(queues_key)
+    queues_data = json.loads(queues_bytes.decode("utf-8"))
+
+    conversations_data = []
+
+    # # Fetch conversations data
+    conversations_key = f"{env}/evals/conversations_dummy.json"
+    conversations_bytes = download_file_from_s3_as_bytes(conversations_key)
+    conversations_data = json.loads(conversations_bytes.decode("utf-8"))
+
+    # Store data globally on the server
+    return {"queues": queues_data, "conversations": conversations_data}
+
+
+@app.get("/api/data")
+async def get_data():
+    """Fetch data from S3 - both queues and conversations"""
+    global app_data
+    try:
+        app_data = get_app_data()
+        return app_data
+
+    except Exception as e:
+        return {"error": str(e)}
 
 
 serve()

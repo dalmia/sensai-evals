@@ -1,6 +1,7 @@
 from auth import require_auth, get_current_user
 from components.header import create_header
 from components.filters import create_filters_sidebar
+from fasthtml.common import Script, ScriptX
 import json
 
 
@@ -42,6 +43,9 @@ def runs_page(request, app_data):
     annotated_count = len(
         [r for r in runs if r.get("annotations") and r["annotations"]]
     )
+
+    # Import the runs.js file
+    runs_script = ScriptX("js/runs.js")
 
     return f"""
     <!DOCTYPE html>
@@ -105,7 +109,7 @@ def runs_page(request, app_data):
             </div>
         </div>
         
-        <script src="/js/runs.js"></script>
+        {runs_script}
         <script>
             // Initialize runs data
             initializeRunsData({json.dumps(runs)});

@@ -41,7 +41,13 @@ def runs_page(request, app_data):
 
     # Calculate annotation statistics
     annotated_count = len(
-        [r for r in runs if r.get("annotations") and r["annotations"]]
+        [
+            r
+            for r in runs
+            if r.get("annotations")
+            and r["annotations"].get(user)
+            and r["annotations"][user].get("judgement") in ["correct", "wrong"]
+        ]
     )
 
     # Import the runs.js file
@@ -143,7 +149,7 @@ def runs_page(request, app_data):
         {runs_script}
         <script>
             // Initialize runs data with pagination settings
-            initializeRunsData({json.dumps(runs)}, 50);
+            initializeRunsData({json.dumps(runs)}, 50, '{user}');
         </script>
     </body>
     </html>

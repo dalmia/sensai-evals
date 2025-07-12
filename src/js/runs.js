@@ -2,6 +2,7 @@
 let runsData = [];
 let currentSort = {'by': 'timestamp', 'order': 'desc'};
 let filteredRuns = [];
+let currentUser = ''; // Current logged-in user
 
 // Pagination variables
 let currentPage = 1;
@@ -13,9 +14,10 @@ let allRunsSelected = false;
 let selectedRunIds = new Set();
 
 // Initialize runs data
-function initializeRunsData(data, itemsPerPage = 50) {
+function initializeRunsData(data, itemsPerPage = 50, user = '') {
     runsData = data;
     pageSize = itemsPerPage;
+    currentUser = user; // Set the current user
     filteredRuns = runsData;
     totalPages = Math.ceil(filteredRuns.length / pageSize);
     currentPage = 1;
@@ -182,10 +184,12 @@ function passesCourseFilter(run, filters) {
 
 // Get annotation status from run data
 function getAnnotationStatus(run) {
-    if (!run.annotations) return null;
+    if (!run.annotations || !currentUser) return null;
     
-    for (const [annotator, annotationData] of Object.entries(run.annotations)) {
-        const judgement = annotationData.judgement;
+    // Only check annotations from the current logged-in user
+    const userAnnotation = run.annotations[currentUser];
+    if (userAnnotation && userAnnotation.judgement) {
+        const judgement = userAnnotation.judgement;
         if (judgement === 'correct' || judgement === 'wrong') {
             return judgement;
         }
@@ -214,9 +218,12 @@ function updateRunsCount() {
 // Calculate annotated count for filtered runs
 function getAnnotatedCount(runs) {
     return runs.filter(run => {
-        if (!run.annotations) return false;
-        for (const [annotator, annotationData] of Object.entries(run.annotations)) {
-            const judgement = annotationData.judgement;
+        if (!run.annotations || !currentUser) return false;
+        
+        // Only check annotations from the current logged-in user
+        const userAnnotation = run.annotations[currentUser];
+        if (userAnnotation && userAnnotation.judgement) {
+            const judgement = userAnnotation.judgement;
             if (judgement === 'correct' || judgement === 'wrong') {
                 return true;
             }

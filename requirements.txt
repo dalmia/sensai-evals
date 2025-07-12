@@ -1,9 +1,5 @@
-python-fasthtml
+python-fasthtml==0.12.21
 uvicorn
 python-dotenv
 boto3
 aiosqlite
-pytest==8.4.1
-pytest-asyncio==1.0.0
-pytest-cov==6.2.1
-pytest-pythonpath==0.7.4

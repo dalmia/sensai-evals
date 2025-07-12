@@ -12,6 +12,7 @@ from .config import (
 )
 from contextlib import asynccontextmanager
 import aiosqlite
+from typing import Optional, List
 
 
 @asynccontextmanager
@@ -221,7 +222,9 @@ async def create_user(name: str):
         return cursor.lastrowid
 
 
-async def create_queue(name: str, description: str, user_id: int):
+async def create_queue(
+    name: str, description: str, user_id: int, runs: Optional[List[int]] = None
+):
     """
     Create a new queue for a user.
 

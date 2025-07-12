@@ -767,4 +767,38 @@ function nextPage() {
     if (currentPage < totalPages) {
         goToPage(currentPage + 1);
     }
+}
+
+// Function to handle create annotation queue button click
+function createAnnotationQueue() {
+    // Check if any rows are selected
+    const selectedCount = selectedRunIds.size;
+    
+    if (selectedCount === 0) {
+        // Show toast notification that no rows are selected
+        Toastify({
+            text: "Please select at least one run to create an annotation queue",
+            duration: 3000,
+            gravity: "top",
+            position: "right",
+            backgroundColor: "#ef4444",
+            stopOnFocus: true,
+            close: true
+        }).showToast();
+        return;
+    }
+    
+    // TODO: Implement actual annotation queue creation logic
+    console.log(`Creating annotation queue with ${selectedCount} selected runs`);
+    
+    // Show success toast
+    Toastify({
+        text: `Creating annotation queue with ${selectedCount} selected runs...`,
+        duration: 3000,
+        gravity: "top",
+        position: "right",
+        backgroundColor: "#10b981",
+        stopOnFocus: true,
+        close: true
+    }).showToast();
 } 

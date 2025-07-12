@@ -53,6 +53,8 @@ def runs_page(request, app_data):
     <head>
         <title>SensAI evals | Runs</title>
         <script src="https://cdn.tailwindcss.com"></script>
+        <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+        <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
     </head>
     <body class="bg-gray-100 min-h-screen">
         {create_header(user, "runs")}
@@ -70,7 +72,7 @@ def runs_page(request, app_data):
                             <h2 id="runsHeader" class="text-lg font-semibold text-gray-900">All runs ({len(runs)})</h2>
                             <span id="annotatedCount" class="text-sm text-gray-500">Annotated {annotated_count}/{len(runs)}</span>
                         </div>
-                        <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                        <button onclick="createAnnotationQueue()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
                             Create annotation queue
                         </button>
                     </div>

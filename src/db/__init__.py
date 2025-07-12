@@ -1,7 +1,14 @@
 import sqlite3
 import os
 from os.path import exists
-from db.config import sqlite_db_path
+from db.config import (
+    sqlite_db_path,
+    runs_table_name,
+    queues_table_name,
+    annotations_table_name,
+    queue_runs_table_name,
+    users_table_name,
+)
 from contextlib import asynccontextmanager
 import aiosqlite
 
@@ -37,7 +44,68 @@ def set_db_defaults():
 
 
 async def create_tables(cursor):
-    pass
+    await cursor.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS {runs_table_name} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id TEXT,
+            start_time TEXT,
+            end_time TEXT,
+            messages TEXT,
+            trace_id TEXT,
+            metadata TEXT,
+            created_at NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """
+    )
+
+    await cursor.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS {queues_table_name} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            description TEXT,
+            user_id INTEGER NOT NULL,
+            created_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES {users_table_name} (id)
+        )
+    """
+    )
+
+    await cursor.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS {queue_runs_table_name} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            queue_id INTEGER NOT NULL,
+            run_id INTEGER NOT NULL,
+        )
+    """
+    )
+
+    await cursor.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS {annotations_table_name} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            judgement TEXT NOT NULL,
+            notes TEXT,
+            created_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (run_id) REFERENCES {runs_table_name} (id),
+            FOREIGN KEY (user_id) REFERENCES {users_table_name} (id)
+        )
+    """
+    )
+
+    await cursor.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS {users_table_name} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            created_at NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """
+    )
 
 
 async def init_db():

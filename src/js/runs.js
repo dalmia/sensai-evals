@@ -449,7 +449,7 @@ function generateRunsHTML(sortedRuns, startIndex) {
             <div class="border-b border-gray-100 px-6 py-4 hover:bg-gray-50">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-3">
-                        <input type="checkbox" id="rowCheckbox_${startIndex + i}" class="row-checkbox w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" onchange="updateSelectedCount()">
+                        <input type="checkbox" id="rowCheckbox_${runId}" class="row-checkbox w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" onchange="updateSelectedCount()">
                         <div>
                             <div class="text-sm font-medium text-gray-900">${runName}</div>
                             <div class="flex items-center space-x-2 mt-1">
@@ -788,17 +788,179 @@ function createAnnotationQueue() {
         return;
     }
     
-    // TODO: Implement actual annotation queue creation logic
-    console.log(`Creating annotation queue with ${selectedCount} selected runs`);
+    // Show modal for queue name input
+    showCreateQueueModal(selectedCount);
+}
+
+// Function to show the create queue modal
+function showCreateQueueModal(selectedCount) {
+    // Create modal HTML
+    const modalHTML = `
+        <div id="createQueueModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                <div class="mt-3">
+                    <div class="mt-2 text-center">
+                        <div class="mt-2 px-7">
+                            <p class="text-sm text-gray-500">
+                                Creating queue with ${selectedCount} selected run${selectedCount > 1 ? 's' : ''}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <label for="queueName" class="text-sm font-medium text-gray-700 mb-2 hidden">
+                            Queue Name
+                        </label>
+                        <input 
+                            type="text" 
+                            id="queueName" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Enter queue name"
+                            autofocus
+                        >
+                    </div>
+                    <div class="mt-6">
+                        <button 
+                            onclick="submitCreateQueue()" 
+                            class="w-full px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                        >
+                            Create
+                        </button>
+                    </div>
+                    <div class="mt-3">
+                        <button 
+                            onclick="closeCreateQueueModal()" 
+                            class="w-full px-4 py-2 bg-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
     
-    // Show success toast
-    Toastify({
-        text: `Creating annotation queue with ${selectedCount} selected runs...`,
-        duration: 3000,
-        gravity: "top",
-        position: "right",
-        backgroundColor: "#10b981",
-        stopOnFocus: true,
-        close: true
-    }).showToast();
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Focus on input field
+    setTimeout(() => {
+        const input = document.getElementById('queueName');
+        if (input) {
+            input.focus();
+        }
+    }, 100);
+    
+    // Add event listener for Enter key
+    const input = document.getElementById('queueName');
+    if (input) {
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                submitCreateQueue();
+            }
+        });
+    }
+}
+
+// Function to submit the create queue form
+async function submitCreateQueue() {
+    const queueName = document.getElementById('queueName').value.trim();
+    
+    if (!queueName) {
+        // Show error toast
+        Toastify({
+            text: "Please enter a queue name",
+            duration: 3000,
+            gravity: "top",
+            position: "right",
+            backgroundColor: "#ef4444",
+            stopOnFocus: true,
+            close: true
+        }).showToast();
+        return;
+    }
+    
+    // Get the Create button and show spinner
+    const createButton = document.querySelector('button[onclick="submitCreateQueue()"]');
+    const originalButtonText = createButton.innerHTML;
+    createButton.innerHTML = `
+        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+    `;
+    createButton.disabled = true;
+    
+    try {
+        // Convert selectedRunIds Set to Array of integers
+        const runIds = Array.from(selectedRunIds).map(id => parseInt(id));
+        
+        // Call the API to create the queue
+        const response = await fetch('/api/queues', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                name: queueName,
+                description: `Queue created from ${runIds.length} selected runs`,
+                run_ids: runIds
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to create queue');
+        }
+        
+        // Show success toast
+        Toastify({
+            text: `Queue "${queueName}" created successfully!`,
+            duration: 3000,
+            gravity: "top",
+            position: "right",
+            backgroundColor: "#10b981",
+            stopOnFocus: true,
+            close: true
+        }).showToast();
+        
+        // Clear selection
+        selectedRunIds.clear();
+        allRunsSelected = false;
+        updateSelectedCount();
+        
+        // Close modal
+        closeCreateQueueModal();
+        
+        // Redirect to the new queue page
+        if (result.queue && result.queue.id) {
+            window.location.href = `/queues/${result.queue.id}`;
+        }
+        
+    } catch (error) {
+        console.error('Error creating queue:', error);
+        
+        // Reset button to original state
+        createButton.innerHTML = originalButtonText;
+        createButton.disabled = false;
+        
+        // Show error toast
+        Toastify({
+            text: `Failed to create queue: ${error.message}`,
+            duration: 5000,
+            gravity: "top",
+            position: "right",
+            backgroundColor: "#ef4444",
+            stopOnFocus: true,
+            close: true
+        }).showToast();
+    }
+}
+
+// Function to close the create queue modal
+function closeCreateQueueModal() {
+    const modal = document.getElementById('createQueueModal');
+    if (modal) {
+        modal.remove();
+    }
 } 

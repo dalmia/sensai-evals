@@ -222,6 +222,69 @@ async def create_user(name: str):
         return cursor.lastrowid
 
 
+async def get_queue(queue_id: int):
+    """
+    Get a queue with its associated user information and runs with annotations.
+    """
+    async with get_new_db_connection() as conn:
+        cursor = await conn.cursor()
+
+        await cursor.execute(
+            f"""
+            SELECT q.id, q.name, q.user_id, u.name as user_name, q.created_at,
+                   r.id as run_id, r.run_id as span_id, r.start_time, r.end_time, r.messages, r.metadata, r.created_at as run_created_at,
+                   a.judgement, a.notes, a.created_at as annotation_timestamp, ann_user.name as annotation_username
+            FROM {queues_table_name} q
+            JOIN {users_table_name} u ON q.user_id = u.id
+            LEFT JOIN {queue_runs_table_name} qr ON q.id = qr.queue_id
+            LEFT JOIN {runs_table_name} r ON qr.run_id = r.id
+            LEFT JOIN {annotations_table_name} a ON r.id = a.run_id
+            LEFT JOIN {users_table_name} ann_user ON a.user_id = ann_user.id
+            WHERE q.id = ?
+            ORDER BY r.created_at DESC
+            """,
+            (queue_id,),
+        )
+
+        rows = await cursor.fetchall()
+
+        queue = {
+            "id": rows[0][0],
+            "name": rows[0][1],
+            "user_id": rows[0][2],
+            "user_name": rows[0][3],
+            "created_at": rows[0][4],
+            "runs": [],
+        }
+
+        for row in rows:
+            run = {
+                "id": row[5],
+                "run_id": row[6],
+                "start_time": row[7],
+                "end_time": row[8],
+                "messages": json.loads(
+                    row[9].replace("<", "&lt;").replace(">", "&gt;")
+                ),
+                "metadata": json.loads(
+                    row[10].replace("<", "&lt;").replace(">", "&gt;")
+                ),
+                "created_at": row[11],
+                "annotations": {},
+            }
+
+            if row[15] is not None:
+                run["annotations"][row[15]] = {
+                    "judgement": row[12],
+                    "notes": row[13],
+                    "timestamp": row[14],
+                }
+
+            queue["runs"].append(run)
+
+        return queue
+
+
 async def create_queue(
     name: str, description: str, user_id: int, runs: Optional[List[int]] = None
 ):
@@ -247,8 +310,20 @@ async def create_queue(
             (name, description, user_id),
         )
 
+        queue_id = cursor.lastrowid
+
+        if runs:
+            values = [(queue_id, run_id) for run_id in runs]
+            await cursor.executemany(
+                f"""
+                INSERT INTO {queue_runs_table_name} (queue_id, run_id)
+                VALUES (?, ?)
+                """,
+                values,
+            )
+
         await conn.commit()
-        return cursor.lastrowid
+        return await get_queue(queue_id)
 
 
 async def bulk_insert_queues(values: list[tuple]):
@@ -486,7 +561,7 @@ async def get_all_queues():
 
         await cursor.execute(
             f"""
-            SELECT q.id, q.name, q.description, q.user_id, u.name as user_name, q.created_at,
+            SELECT q.id, q.name, q.user_id, u.name as user_name, q.created_at,
                    r.id as run_id, r.run_id as span_id, r.start_time, r.end_time, r.messages, r.metadata, r.created_at as run_created_at,
                    a.judgement, a.notes, a.created_at as annotation_timestamp, ann_user.name as annotation_username
             FROM {queues_table_name} q
@@ -520,10 +595,9 @@ async def get_all_queues():
                 current_queue = {
                     "id": row[0],
                     "name": row[1],
-                    "description": row[2],
-                    "user_id": row[3],
-                    "user_name": row[4],
-                    "created_at": row[5],
+                    "user_id": row[2],
+                    "user_name": row[3],
+                    "created_at": row[4],
                     "runs": [],
                 }
                 current_run = None
@@ -536,26 +610,26 @@ async def get_all_queues():
                         current_queue["runs"].append(current_run)
 
                     current_run = {
-                        "id": row[6],
-                        "run_id": row[7],
-                        "start_time": row[8],
-                        "end_time": row[9],
+                        "id": row[5],
+                        "run_id": row[6],
+                        "start_time": row[7],
+                        "end_time": row[8],
                         "messages": json.loads(
-                            row[10].replace("<", "&lt;").replace(">", "&gt;")
+                            row[9].replace("<", "&lt;").replace(">", "&gt;")
                         ),
                         "metadata": json.loads(
-                            row[11].replace("<", "&lt;").replace(">", "&gt;")
+                            row[10].replace("<", "&lt;").replace(">", "&gt;")
                         ),
-                        "created_at": row[12],
+                        "created_at": row[11],
                         "annotations": {},
                     }
 
                 # Add annotation if it exists (annotation_username is not None)
-                if row[16] is not None:  # annotation_username is not None
-                    current_run["annotations"][row[16]] = {
-                        "judgement": row[13],
-                        "notes": row[14],
-                        "timestamp": row[15],
+                if row[15] is not None:  # annotation_username is not None
+                    current_run["annotations"][row[15]] = {
+                        "judgement": row[12],
+                        "notes": row[13],
+                        "timestamp": row[14],
                     }
 
         # Add the last run to the last queue
@@ -565,3 +639,11 @@ async def get_all_queues():
             queues.append(current_queue)
 
         return queues
+
+
+async def get_all_users():
+    async with get_new_db_connection() as conn:
+        cursor = await conn.cursor()
+        await cursor.execute(f"""SELECT id, name FROM {users_table_name}""")
+        rows = await cursor.fetchall()
+        return [{"id": row[0], "name": row[1]} for row in rows]

@@ -1,14 +1,16 @@
 from fasthtml.common import *
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import RedirectResponse
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 # Import modularized components
-from auth import VALID_USERS, get_current_user
+from auth import VALID_USERS, get_current_user, require_auth
 from pages.runs import runs_page
 from pages.queues import queues_page
 from pages.queue import individual_queue_page
 from dotenv import load_dotenv
-from db import fetch_all_runs, get_all_queues
+from db import fetch_all_runs, get_all_queues, create_queue, create_user
 import json
 import os
 
@@ -136,7 +138,12 @@ def login_page(request):
     if user:
         return RedirectResponse(url="/", status_code=302)
 
-    return """
+    # Generate options from VALID_USERS dictionary
+    options_html = ""
+    for username in VALID_USERS.keys():
+        options_html += f'<option value="{username}">{username}</option>'
+
+    return f"""
     <!DOCTYPE html>
     <html>
     <head>
@@ -151,9 +158,7 @@ def login_page(request):
                     <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
                     <select name="username" id="username" required class="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
                         <option value="" disabled selected>Select username</option>
-                        <option value="Aman">Aman</option>
-                        <option value="Piyush">Piyush</option>
-                        <option value="Gayathri">Gayathri</option>
+                        {options_html}
                     </select>
                 </div>
                 <div class="mb-6">
@@ -175,7 +180,7 @@ async def login_post(request):
     username = form_data.get("username")
     password = form_data.get("password")
 
-    if username in VALID_USERS and VALID_USERS[username] == password:
+    if username in VALID_USERS and VALID_USERS[username]["password"] == password:
         request.session["user"] = username
         return RedirectResponse(url="/", status_code=302)
     else:
@@ -236,6 +241,46 @@ async def get_data():
 
     except Exception as e:
         return {"error": str(e)}
+
+
+@app.post("/api/queues")
+async def create_queue_api(request: Request):
+    """API endpoint to create a new queue"""
+    # Check authentication
+    auth_redirect = require_auth(request)
+    if auth_redirect:
+        return JSONResponse({"error": "Authentication required"}, status_code=401)
+
+    try:
+        # Parse JSON body
+        body = await request.json()
+        name = body.get("name")
+        description = body.get("description", "")
+        run_ids = body.get("run_ids", [])
+
+        if not name:
+            return JSONResponse({"error": "Queue name is required"}, status_code=400)
+
+        # Get current user
+        user = get_current_user(request)
+        print(user)
+        user_id = VALID_USERS[user]["id"]
+
+        print(name, description, user_id, run_ids)
+        # Create the queue
+        new_queue = await create_queue(name, description, user_id, run_ids)
+
+        # Update global app_data with new queue
+        global app_data
+        if app_data and "queues" in app_data:
+            app_data["queues"].insert(
+                0, new_queue
+            )  # Add to beginning since queues are ordered by created_at DESC
+
+        return JSONResponse({"success": True, "queue": new_queue})
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 serve()

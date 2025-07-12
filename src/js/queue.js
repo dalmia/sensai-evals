@@ -576,7 +576,7 @@ function selectRun(runIndex) {
     const annotationSpanStyle = anySidebarOpen ? 'style="display: none;"' : '';
     const metadataSpanStyle = anySidebarOpen ? 'style="display: none;"' : '';
     
-    mainContent.innerHTML = '<div class="flex-1 bg-white flex flex-col relative h-full">' +
+    mainContent.innerHTML = '<div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden flex flex-col" style="height: calc(100vh - 120px);">' +
         '<div class="border-b border-gray-200 px-6 py-4 flex-shrink-0">' +
         '<div class="flex justify-between items-center">' +
         '<h1 class="text-lg font-semibold text-gray-900">' + runName + '</h1>' +
@@ -592,7 +592,7 @@ function selectRun(runIndex) {
         '</div>' +
         '</div>' +
         '</div>' +
-        '<div class="flex-1 overflow-y-auto p-6">' +
+        '<div class="flex-1 overflow-y-auto p-6 min-h-0">' +
         '<div class="mb-8">' +
         '<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">' +
         '<div class="text-sm text-yellow-700 whitespace-pre-wrap">' + context + '</div>' +

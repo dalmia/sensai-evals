@@ -162,82 +162,84 @@ def individual_queue_page(request, queue_id, app_data):
         
         <!-- Main Content -->
         <div class="flex h-screen overflow-hidden">
-            <!-- Runs Sidebar -->
-            <div class="w-96 bg-white border-r border-gray-200 flex-shrink-0 overflow-y-auto">
-                <!-- Queue Header -->
-                <div class="p-4 border-b border-gray-200">
-                    <h2 class="text-lg font-semibold text-gray-900">{queue["name"]} ({len(runs)})</h2>
-                    <p class="text-sm text-gray-500">Created by {queue["user_name"]}</p>
-                </div>
-                
-                <!-- Filters and Timestamp Header -->
-                <div class="bg-gray-50 border-b border-gray-200 px-4 py-3">
-                    <div class="flex items-center justify-between space-x-3">
-                        <div class="flex items-center space-x-3">
-                            <!-- Annotator Filter -->
-                            <div class="relative">
-                                <div class="text-xs text-gray-500 mb-1">Annotator</div>
-                                <button onclick="toggleAnnotatorFilter()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs font-medium border border-gray-300 flex items-center space-x-1">
-                                    <span id="currentAnnotator">{user}</span>
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                    </svg>
-                                </button>
-                                <div id="annotatorFilterDropdown" class="absolute left-0 mt-1 w-28 bg-white border border-gray-200 rounded-lg shadow-lg z-10 hidden">
-                                    <div class="py-1">
-                                        <button onclick="filterByAnnotator('Aman')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Aman</button>
-                                        <button onclick="filterByAnnotator('Piyush')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Piyush</button>
-                                        <button onclick="filterByAnnotator('Gayathri')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Gayathri</button>
+            <!-- Runs Sidebar Card -->
+            <div class="p-4 flex-shrink-0">
+                <div class="w-96 bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                    <!-- Queue Header -->
+                    <div class="p-4 border-b border-gray-200">
+                        <h2 class="text-lg font-semibold text-gray-900">{queue["name"]} ({len(runs)})</h2>
+                        <p class="text-sm text-gray-500">Created by {queue["user_name"]}</p>
+                    </div>
+                    
+                    <!-- Filters and Timestamp Header -->
+                    <div class="bg-gray-50 border-b border-gray-200 px-4 py-3">
+                        <div class="flex items-center justify-between space-x-3">
+                            <div class="flex items-center space-x-3">
+                                <!-- Annotator Filter -->
+                                <div class="relative">
+                                    <div class="text-xs text-gray-500 mb-1">Annotator</div>
+                                    <button onclick="toggleAnnotatorFilter()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs font-medium border border-gray-300 flex items-center space-x-1">
+                                        <span id="currentAnnotator">{user}</span>
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        </svg>
+                                    </button>
+                                    <div id="annotatorFilterDropdown" class="absolute left-0 mt-1 w-28 bg-white border border-gray-200 rounded-lg shadow-lg z-10 hidden">
+                                        <div class="py-1">
+                                            <button onclick="filterByAnnotator('Aman')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Aman</button>
+                                            <button onclick="filterByAnnotator('Piyush')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Piyush</button>
+                                            <button onclick="filterByAnnotator('Gayathri')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Gayathri</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Status Filter -->
+                                <div class="relative">
+                                    <div class="text-xs text-gray-500 mb-1">Status</div>
+                                    <button onclick="toggleAnnotationFilter()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs font-medium border border-gray-300 flex items-center space-x-1">
+                                        <span id="currentFilter">All</span>
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        </svg>
+                                    </button>
+                                    <div id="annotationFilterDropdown" class="absolute left-0 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-10 hidden">
+                                        <div class="py-1">
+                                            <button onclick="filterByAnnotation('all')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">All</button>
+                                            <button onclick="filterByAnnotation('empty')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Not Annotated</button>
+                                            <button onclick="filterByAnnotation('correct')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Correct</button>
+                                            <button onclick="filterByAnnotation('wrong')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Wrong</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                             
-                            <!-- Status Filter -->
-                            <div class="relative">
-                                <div class="text-xs text-gray-500 mb-1">Status</div>
-                                <button onclick="toggleAnnotationFilter()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs font-medium border border-gray-300 flex items-center space-x-1">
-                                    <span id="currentFilter">All</span>
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                    </svg>
-                                </button>
-                                <div id="annotationFilterDropdown" class="absolute left-0 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-10 hidden">
-                                    <div class="py-1">
-                                        <button onclick="filterByAnnotation('all')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">All</button>
-                                        <button onclick="filterByAnnotation('empty')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Not Annotated</button>
-                                        <button onclick="filterByAnnotation('correct')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Correct</button>
-                                        <button onclick="filterByAnnotation('wrong')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Wrong</button>
-                                    </div>
+                            <!-- Timestamp Sorting -->
+                            <div class="flex items-center" id="timestampHeader">
+                                <div class="relative">
+                                    <div class="text-xs text-gray-500 mb-1">Sort by</div>
+                                    <button onclick="toggleTimestampSort()" class="flex items-center text-gray-700 hover:text-gray-900 p-1 rounded transition-colors">
+                                        <span class="text-xs font-medium">Created At</span>
+                                        <div class="ml-1" id="timestampArrow">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                            </svg>
+                                        </div>
+                                    </button>
                                 </div>
                             </div>
                         </div>
-                        
-                        <!-- Timestamp Sorting -->
-                        <div class="flex items-center" id="timestampHeader">
-                            <div class="relative">
-                                <div class="text-xs text-gray-500 mb-1">Sort by</div>
-                                <button onclick="toggleTimestampSort()" class="flex items-center text-gray-700 hover:text-gray-900 p-1 rounded transition-colors">
-                                    <span class="text-xs font-medium">Created At</span>
-                                    <div class="ml-1" id="timestampArrow">
-                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                        </svg>
-                                    </div>
-                                </button>
-                            </div>
-                        </div>
                     </div>
-                </div>
-                
-                <!-- Queue Runs List -->
-                <div id="runsList">
                     
+                    <!-- Queue Runs List -->
+                    <div id="runsList" class="overflow-y-auto" style="height: calc(100vh - 280px);">
+                        
+                    </div>
                 </div>
             </div>
             
             <!-- Main Content Area -->
-            <div class="flex-1 bg-gray-50 transition-all duration-300 relative" id="mainContent">
-                <div class="flex items-center justify-center h-full">
+            <div class="flex-1 transition-all duration-300 relative p-4" id="mainContent">
+                <div class="bg-white rounded-lg shadow-sm flex items-center justify-center" style="height: calc(100vh - 120px);">
                     <div class="text-center">
                         <div class="text-gray-400 mb-4">
                             <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">

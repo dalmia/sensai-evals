@@ -211,7 +211,7 @@ def logout(request):
 from fastcore.xtras import timed_cache
 
 
-# @timed_cache(seconds=3600)
+@timed_cache(seconds=3600)
 async def get_app_data():
     """Fetch data from database - both runs and queues"""
     try:

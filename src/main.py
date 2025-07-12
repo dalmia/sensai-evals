@@ -8,7 +8,7 @@ from pages.runs import runs_page
 from pages.queues import queues_page
 from pages.queue import individual_queue_page
 from dotenv import load_dotenv
-from utils import download_file_from_s3_as_bytes
+from db import fetch_all_runs, get_all_queues
 import json
 import os
 
@@ -212,34 +212,27 @@ from fastcore.xtras import timed_cache
 
 
 # @timed_cache(seconds=3600)
-def get_app_data():
-    """Fetch data from S3 - both queues and conversations"""
-    env = os.getenv("ENV")
-    if not env:
-        return {"error": "ENV environment variable not set"}
+async def get_app_data():
+    """Fetch data from database - both runs and queues"""
+    try:
+        # Fetch runs data
+        runs_data = await fetch_all_runs()
 
-    # Fetch queues data
-    queues_key = f"{env}/evals/queues_dummy.json"
-    queues_bytes = download_file_from_s3_as_bytes(queues_key)
-    queues_data = json.loads(queues_bytes.decode("utf-8"))
+        # Fetch queues data
+        queues_data = await get_all_queues()
 
-    conversations_data = []
-
-    # # Fetch conversations data
-    conversations_key = f"{env}/evals/conversations_dummy.json"
-    conversations_bytes = download_file_from_s3_as_bytes(conversations_key)
-    conversations_data = json.loads(conversations_bytes.decode("utf-8"))
-
-    # Store data globally on the server
-    return {"queues": queues_data, "conversations": conversations_data}
+        # Store data globally on the server
+        return {"runs": runs_data, "queues": queues_data}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.get("/api/data")
 async def get_data():
-    """Fetch data from S3 - both queues and conversations"""
+    """Fetch data from database - both runs and queues"""
     global app_data
     try:
-        app_data = get_app_data()
+        app_data = await get_app_data()
         return app_data
 
     except Exception as e:

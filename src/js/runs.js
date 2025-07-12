@@ -3,11 +3,25 @@ let runsData = [];
 let currentSort = {'by': 'timestamp', 'order': 'desc'};
 let filteredRuns = [];
 
+// Pagination variables
+let currentPage = 1;
+let pageSize = 50;
+let totalPages = 1;
+
+// Selection variables
+let allRunsSelected = false;
+let selectedRunIds = new Set();
+
 // Initialize runs data
-function initializeRunsData(data) {
+function initializeRunsData(data, itemsPerPage = 50) {
     runsData = data;
+    pageSize = itemsPerPage;
     filteredRuns = runsData;
+    totalPages = Math.ceil(filteredRuns.length / pageSize);
+    currentPage = 1;
     updateRunsDisplay();
+    updatePagination();
+    updateRunsCount(); // This will also call updateAnnotatedCount
 }
 
 function toggleDropdown() {
@@ -69,8 +83,18 @@ function applyFilters() {
         return true;
     });
 
+    // Reset pagination when filters are applied
+    totalPages = Math.ceil(filteredRuns.length / pageSize);
+    currentPage = 1;
+    
+    // Reset selection state when filters are applied
+    allRunsSelected = false;
+    selectedRunIds.clear();
+    
     updateRunsDisplay();
     updateRunsCount();
+    updateAnnotatedCount();
+    updatePagination();
 }
 
 // Individual filter functions
@@ -165,7 +189,7 @@ function getAnnotationStatus(run) {
 
 // Update runs count in header
 function updateRunsCount() {
-    const headerElement = document.querySelector('h2');
+    const headerElement = document.getElementById('runsHeader');
     if (headerElement) {
         const totalRuns = runsData.length;
         const filteredCount = filteredRuns.length;
@@ -174,6 +198,40 @@ function updateRunsCount() {
             headerElement.textContent = `All runs (${totalRuns})`;
         } else {
             headerElement.textContent = `All runs (${filteredCount} of ${totalRuns})`;
+        }
+    }
+    
+    // Also update annotated count to keep both labels in sync
+    updateAnnotatedCount();
+}
+
+// Calculate annotated count for filtered runs
+function getAnnotatedCount(runs) {
+    return runs.filter(run => {
+        if (!run.annotations) return false;
+        for (const [annotator, annotationData] of Object.entries(run.annotations)) {
+            const judgement = annotationData.judgement;
+            if (judgement === 'correct' || judgement === 'wrong') {
+                return true;
+            }
+        }
+        return false;
+    }).length;
+}
+
+// Update annotated count display
+function updateAnnotatedCount() {
+    const annotatedCountElement = document.getElementById('annotatedCount');
+    if (annotatedCountElement) {
+        const filteredAnnotatedCount = getAnnotatedCount(filteredRuns);
+        const totalRuns = runsData.length;
+        
+        if (filteredRuns.length === totalRuns) {
+            // No filters applied, show total counts
+            annotatedCountElement.textContent = `Annotated ${filteredAnnotatedCount}/${totalRuns}`;
+        } else {
+            // Filters applied, show filtered counts
+            annotatedCountElement.textContent = `Annotated ${filteredAnnotatedCount}/${filteredRuns.length}`;
         }
     }
 }
@@ -199,7 +257,7 @@ function clearAllFilters() {
     filterOrganizations();
     filterCourses();
     
-    // Apply filters (which will show all runs)
+    // Apply filters (which will show all runs and reset pagination)
     applyFilters();
 }
 
@@ -257,7 +315,7 @@ function sortRuns(runs, sortBy, sortOrder) {
 }
 
 // Generate runs HTML
-function generateRunsHTML(sortedRuns) {
+function generateRunsHTML(sortedRuns, startIndex) {
     let runsHtml = '';
     for (let i = 0; i < sortedRuns.length; i++) {
         const run = sortedRuns[i];
@@ -313,16 +371,47 @@ function generateRunsHTML(sortedRuns) {
         const courseName = metadata.course?.name || '';
         const milestoneName = metadata.milestone?.name || '';
         const orgName = metadata.org?.name || '';
+        const taskTitle = metadata.task_title || '';
+        const questionTitle = metadata.question_title || '';
+        const runType = metadata.type || '';
         
-        let runName;
+        let runName = '';
+        
+        // Start with task title if available
+        if (taskTitle) {
+            runName = taskTitle;
+        }
+        
+        // For quiz types, add question title after task title
+        if (runType === 'quiz' && questionTitle) {
+            if (runName) {
+                runName += ` - ${questionTitle}`;
+            } else {
+                runName = questionTitle;
+            }
+        }
+        
+        // Add course and milestone information
         if (courseName && milestoneName) {
-            runName = `${courseName} - ${milestoneName}`;
+            if (runName) {
+                runName += ` - ${courseName} - ${milestoneName}`;
+            } else {
+                runName = `${courseName} - ${milestoneName}`;
+            }
         } else if (courseName) {
-            runName = courseName;
-        } else {
+            if (runName) {
+                runName += ` - ${courseName}`;
+            } else {
+                runName = courseName;
+            }
+        }
+        
+        // If no meaningful name constructed, use run ID
+        if (!runName) {
             runName = `Run ${runId}`;
         }
         
+        // Add organization name at the end
         if (orgName) {
             runName = `${runName} (${orgName})`;
         }
@@ -356,7 +445,7 @@ function generateRunsHTML(sortedRuns) {
             <div class="border-b border-gray-100 px-6 py-4 hover:bg-gray-50">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-3">
-                        <input type="checkbox" id="rowCheckbox_${i}" class="row-checkbox w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" onchange="updateSelectedCount()">
+                        <input type="checkbox" id="rowCheckbox_${startIndex + i}" class="row-checkbox w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" onchange="updateSelectedCount()">
                         <div>
                             <div class="text-sm font-medium text-gray-900">${runName}</div>
                             <div class="flex items-center space-x-2 mt-1">
@@ -385,9 +474,29 @@ function generateRunsHTML(sortedRuns) {
 // Update runs display
 function updateRunsDisplay() {
     const sortedRuns = sortRuns(filteredRuns, currentSort.by, currentSort.order);
+    
+    // Calculate pagination slice
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const currentPageRuns = sortedRuns.slice(startIndex, endIndex);
+    
     const runsListElement = document.getElementById('runsList');
     if (runsListElement) {
-        runsListElement.innerHTML = generateRunsHTML(sortedRuns);
+        runsListElement.innerHTML = generateRunsHTML(currentPageRuns, startIndex);
+        
+        // Restore selection state for current page
+        const rowCheckboxes = document.querySelectorAll('.row-checkbox');
+        rowCheckboxes.forEach(function(checkbox) {
+            const runId = checkbox.id.replace('rowCheckbox_', '');
+            if (allRunsSelected || selectedRunIds.has(runId)) {
+                checkbox.checked = true;
+            } else {
+                checkbox.checked = false;
+            }
+        });
+        
+        // Update selection count display
+        updateSelectedCount();
     }
 }
 
@@ -408,26 +517,88 @@ function updateArrow() {
 // Toggle timestamp sort
 function toggleTimestampSort() {
     currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc';
+    currentPage = 1; // Reset to first page when sorting changes
     updateRunsDisplay();
     updateArrow();
+    updatePagination();
 }
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     updateRunsDisplay();
     updateArrow();
+    updatePagination();
 });
 
 // Select/Deselect all functionality
 function toggleSelectAll() {
     const selectAllCheckbox = document.getElementById('selectAllCheckbox');
     const rowCheckboxes = document.querySelectorAll('.row-checkbox');
+    const selectedCountElement = document.getElementById('selectedCount');
     
-    rowCheckboxes.forEach(function(checkbox) {
-        checkbox.checked = selectAllCheckbox.checked;
+    if (selectAllCheckbox.checked) {
+        // If there are multiple pages and not all runs are selected yet, show "Select All" button
+        if (totalPages > 1 && !allRunsSelected) {
+            // Show "Select All" button
+            selectedCountElement.innerHTML = `
+                <span class="text-sm text-gray-500">${rowCheckboxes.length} selected on this page</span>
+                <button onclick="selectAllRuns()" class="ml-2 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">
+                    Select All ${filteredRuns.length} Runs
+                </button>
+            `;
+            selectedCountElement.classList.remove('hidden');
+            
+            // Check all checkboxes on current page
+            rowCheckboxes.forEach(function(checkbox) {
+                checkbox.checked = true;
+                const runId = checkbox.id.replace('rowCheckbox_', '');
+                selectedRunIds.add(runId);
+            });
+        } else {
+            // Single page or already all selected, just select current page
+            rowCheckboxes.forEach(function(checkbox) {
+                checkbox.checked = true;
+                const runId = checkbox.id.replace('rowCheckbox_', '');
+                selectedRunIds.add(runId);
+            });
+            updateSelectedCount();
+        }
+    } else {
+        // Deselect all
+        allRunsSelected = false;
+        selectedRunIds.clear();
+        rowCheckboxes.forEach(function(checkbox) {
+            checkbox.checked = false;
+        });
+        updateSelectedCount();
+    }
+}
+
+// Select all runs across all pages
+function selectAllRuns() {
+    allRunsSelected = true;
+    
+    // Add all filtered run IDs to selected set
+    const sortedRuns = sortRuns(filteredRuns, currentSort.by, currentSort.order);
+    sortedRuns.forEach((run, index) => {
+        selectedRunIds.add(index.toString());
     });
     
-    updateSelectedCount();
+    // Check all checkboxes on current page
+    const rowCheckboxes = document.querySelectorAll('.row-checkbox');
+    rowCheckboxes.forEach(function(checkbox) {
+        checkbox.checked = true;
+    });
+    
+    // Update the select all checkbox to be checked
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    selectAllCheckbox.checked = true;
+    selectAllCheckbox.indeterminate = false;
+    
+    // Update count display
+    const selectedCountElement = document.getElementById('selectedCount');
+    selectedCountElement.textContent = `${filteredRuns.length} selected`;
+    selectedCountElement.classList.remove('hidden');
 }
 
 // Update selected count display
@@ -440,8 +611,25 @@ function updateSelectedCount() {
     const selectedCount = selectedCheckboxes.length;
     const totalCount = rowCheckboxes.length;
     
+    // Update selectedRunIds set based on current page selections
+    selectedCheckboxes.forEach(function(checkbox) {
+        const runId = checkbox.id.replace('rowCheckbox_', '');
+        selectedRunIds.add(runId);
+    });
+    
+    // Remove unchecked items from selectedRunIds
+    rowCheckboxes.forEach(function(checkbox) {
+        if (!checkbox.checked) {
+            const runId = checkbox.id.replace('rowCheckbox_', '');
+            selectedRunIds.delete(runId);
+        }
+    });
+    
     // Update select all checkbox state
-    if (selectedCount === 0) {
+    if (allRunsSelected) {
+        selectAllCheckbox.checked = true;
+        selectAllCheckbox.indeterminate = false;
+    } else if (selectedCount === 0) {
         selectAllCheckbox.checked = false;
         selectAllCheckbox.indeterminate = false;
     } else if (selectedCount === totalCount) {
@@ -453,7 +641,10 @@ function updateSelectedCount() {
     }
     
     // Update count display
-    if (selectedCount > 0) {
+    if (allRunsSelected) {
+        selectedCountElement.textContent = `${filteredRuns.length} selected`;
+        selectedCountElement.classList.remove('hidden');
+    } else if (selectedCount > 0) {
         selectedCountElement.textContent = selectedCount + ' selected';
         selectedCountElement.classList.remove('hidden');
     } else {
@@ -469,4 +660,107 @@ document.addEventListener('click', function(event) {
     if (!button || button.getAttribute('onclick') !== 'toggleDropdown()') {
         dropdown.classList.add('hidden');
     }
-}); 
+});
+
+// Pagination functions
+function updatePagination() {
+    const paginationInfo = document.getElementById('paginationInfo');
+    const totalRunsCount = document.getElementById('totalRunsCount');
+    const prevPageBtn = document.getElementById('prevPageBtn');
+    const nextPageBtn = document.getElementById('nextPageBtn');
+    const pageNumbers = document.getElementById('pageNumbers');
+    
+    if (!paginationInfo || !totalRunsCount || !prevPageBtn || !nextPageBtn || !pageNumbers) {
+        return;
+    }
+    
+    // Update pagination info
+    const startIndex = (currentPage - 1) * pageSize + 1;
+    const endIndex = Math.min(currentPage * pageSize, filteredRuns.length);
+    paginationInfo.textContent = `${startIndex}-${endIndex}`;
+    totalRunsCount.textContent = filteredRuns.length;
+    
+    // Update navigation buttons
+    prevPageBtn.disabled = currentPage === 1;
+    nextPageBtn.disabled = currentPage === totalPages;
+    
+    // Generate page numbers
+    generatePageNumbers(pageNumbers);
+}
+
+function generatePageNumbers(container) {
+    container.innerHTML = '';
+    
+    if (totalPages <= 1) {
+        return;
+    }
+    
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    // Adjust start page if we're near the end
+    if (endPage - startPage + 1 < maxVisiblePages) {
+        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+    
+    // Add first page and ellipsis if needed
+    if (startPage > 1) {
+        addPageButton(container, 1, false);
+        if (startPage > 2) {
+            addEllipsis(container);
+        }
+    }
+    
+    // Add page numbers
+    for (let i = startPage; i <= endPage; i++) {
+        addPageButton(container, i, i === currentPage);
+    }
+    
+    // Add last page and ellipsis if needed
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            addEllipsis(container);
+        }
+        addPageButton(container, totalPages, false);
+    }
+}
+
+function addPageButton(container, pageNum, isActive) {
+    const button = document.createElement('button');
+    button.textContent = pageNum;
+    button.onclick = () => goToPage(pageNum);
+    button.className = `px-3 py-2 text-sm font-medium rounded-md ${
+        isActive 
+            ? 'bg-blue-600 text-white' 
+            : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
+    }`;
+    container.appendChild(button);
+}
+
+function addEllipsis(container) {
+    const span = document.createElement('span');
+    span.textContent = '...';
+    span.className = 'px-3 py-2 text-sm text-gray-500';
+    container.appendChild(span);
+}
+
+function goToPage(pageNum) {
+    if (pageNum >= 1 && pageNum <= totalPages && pageNum !== currentPage) {
+        currentPage = pageNum;
+        updateRunsDisplay();
+        updatePagination();
+    }
+}
+
+function previousPage() {
+    if (currentPage > 1) {
+        goToPage(currentPage - 1);
+    }
+}
+
+function nextPage() {
+    if (currentPage < totalPages) {
+        goToPage(currentPage + 1);
+    }
+} 

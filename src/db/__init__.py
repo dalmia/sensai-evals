@@ -1,5 +1,6 @@
 import sqlite3
 import os
+import json
 from os.path import exists
 from .config import (
     sqlite_db_path,
@@ -162,7 +163,7 @@ async def create_run(
             (run_id, start_time, end_time, messages, metadata)
             VALUES (?, ?, ?, ?, ?)
             """,
-            (run_id, start_time, end_time, messages, metadata),
+            (run_id, start_time, end_time, json.dumps(messages), json.dumps(metadata)),
         )
 
         await conn.commit()
@@ -181,7 +182,16 @@ async def bulk_insert_runs(runs: list[dict]):
             (run_id, start_time, end_time, messages, metadata)
             VALUES (?, ?, ?, ?, ?)
             """,
-            runs,
+            [
+                (
+                    run["run_id"],
+                    run["start_time"],
+                    run["end_time"],
+                    json.dumps(run["messages"]),
+                    json.dumps(run["metadata"]),
+                )
+                for run in runs
+            ],
         )
         await conn.commit()
 
@@ -436,8 +446,12 @@ async def fetch_all_runs():
                     "run_id": row[1],
                     "start_time": row[2],
                     "end_time": row[3],
-                    "messages": row[4],
-                    "metadata": row[5],
+                    "messages": json.loads(
+                        row[4].replace("<", "&lt;").replace(">", "&gt;")
+                    ),
+                    "metadata": json.loads(
+                        row[5].replace("<", "&lt;").replace(">", "&gt;")
+                    ),
                     "created_at": row[6],
                     "annotations": {},
                 }
@@ -523,8 +537,12 @@ async def get_all_queues():
                         "run_id": row[7],
                         "start_time": row[8],
                         "end_time": row[9],
-                        "messages": row[10],
-                        "metadata": row[11],
+                        "messages": json.loads(
+                            row[10].replace("<", "&lt;").replace(">", "&gt;")
+                        ),
+                        "metadata": json.loads(
+                            row[11].replace("<", "&lt;").replace(">", "&gt;")
+                        ),
                         "created_at": row[12],
                         "annotations": {},
                     }

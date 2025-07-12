@@ -13,7 +13,7 @@ def runs_page(request, app_data):
 
     user = get_current_user(request)
 
-    runs = app_data.get("conversations", [])
+    runs = app_data.get("runs", [])
 
     def extract_unique_organizations(runs):
         """Extract unique organizations from runs data"""
@@ -67,12 +67,36 @@ def runs_page(request, app_data):
                 <div class="bg-white border-b border-t border-gray-200 px-6 py-4">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center space-x-4">
-                            <h2 class="text-lg font-semibold text-gray-900">All runs ({len(runs)})</h2>
-                            <span class="text-sm text-gray-500">Annotated {annotated_count}/{len(runs)}</span>
+                            <h2 id="runsHeader" class="text-lg font-semibold text-gray-900">All runs ({len(runs)})</h2>
+                            <span id="annotatedCount" class="text-sm text-gray-500">Annotated {annotated_count}/{len(runs)}</span>
                         </div>
                         <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
                             Create annotation queue
                         </button>
+                    </div>
+                </div>
+                
+                <!-- Pagination -->
+                <div class="bg-white border-b border-gray-200 px-6 py-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-sm text-gray-700">Showing</span>
+                            <span id="paginationInfo" class="text-sm font-medium text-gray-900">1-50</span>
+                            <span class="text-sm text-gray-700">of</span>
+                            <span id="totalRunsCount" class="text-sm font-medium text-gray-900">{len(runs)}</span>
+                            <span class="text-sm text-gray-700">runs</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button id="prevPageBtn" onclick="previousPage()" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                Previous
+                            </button>
+                            <div id="pageNumbers" class="flex items-center space-x-1">
+                                <!-- Page numbers will be generated here -->
+                            </div>
+                            <button id="nextPageBtn" onclick="nextPage()" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                Next
+                            </button>
+                        </div>
                     </div>
                 </div>
                 
@@ -111,8 +135,8 @@ def runs_page(request, app_data):
         
         {runs_script}
         <script>
-            // Initialize runs data
-            initializeRunsData({json.dumps(runs)});
+            // Initialize runs data with pagination settings
+            initializeRunsData({json.dumps(runs)}, 50);
         </script>
     </body>
     </html>

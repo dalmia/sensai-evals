@@ -54,11 +54,8 @@ def create_metadata_sidebar():
             // Add each metadata field
             metadataHtml += createMetadataRow('Stage', metadata.stage || '');
             metadataHtml += createMetadataRow('Type', metadata.type || '');
-            metadataHtml += createMetadataRow('Trace ID', runData.trace_id || '');
-            metadataHtml += createMetadataRow('Span Kind', runData.span_kind || '');
-            metadataHtml += createMetadataRow('Span Name', runData.span_name || '');
-            metadataHtml += createMetadataRow('User ID', String(metadata.user_id || ''));
-            metadataHtml += createMetadataRow('Question ID', String(metadata.question_id || ''));
+            metadataHtml += createMetadataRow('User', String(metadata.user_email || ''));
+            metadataHtml += createMetadataRow('Question Title', String(metadata.question_title || ''));
             metadataHtml += createMetadataRow('Question Type', metadata.question_type || '');
             metadataHtml += createMetadataRow('Purpose', metadata.question_purpose || '');
             metadataHtml += createMetadataRow('Input Type', metadata.question_input_type || '');
@@ -76,7 +73,6 @@ def create_metadata_sidebar():
             // Timing information
             metadataHtml += createMetadataRow('Start Time', formatTimestampForMetadata(runData.start_time || ''));
             metadataHtml += createMetadataRow('End Time', formatTimestampForMetadata(runData.end_time || ''));
-            metadataHtml += createMetadataRow('Uploaded by', runData.uploaded_by || '');
             
             return metadataHtml;
         }

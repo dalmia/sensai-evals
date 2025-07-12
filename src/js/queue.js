@@ -344,9 +344,28 @@ function selectRun(runIndex) {
     const metadataButton = document.querySelector('button[onclick="toggleMetadataSidebar()"]');
     const annotationButton = document.querySelector('button[onclick="toggleAnnotationSidebar()"]');
     
-    // Remember which sidebars were open
+    // Remember which sidebars were open, but ensure only one can be open at a time
     const metadataSidebarWasOpen = metadataSidebar && !metadataSidebar.classList.contains('hidden');
     const annotationSidebarWasOpen = annotationSidebar && !annotationSidebar.classList.contains('hidden');
+    
+    // Determine which sidebar should be open after navigation
+    let finalMetadataSidebarOpen = metadataSidebarWasOpen;
+    let finalAnnotationSidebarOpen = annotationSidebarWasOpen;
+    
+    // If navigating from sidebar, preserve current state
+    if (navigatingFromSidebar) {
+        // Keep current sidebar states as they are
+    } else {
+        // If metadata sidebar is open, keep it open and close annotation sidebar
+        if (metadataSidebarWasOpen) {
+            finalMetadataSidebarOpen = true;
+            finalAnnotationSidebarOpen = false;
+        } else {
+            // Default to opening annotation sidebar if no sidebar was open
+            finalMetadataSidebarOpen = false;
+            finalAnnotationSidebarOpen = true;
+        }
+    }
     
     // Reset the navigating flag
     navigatingFromSidebar = false;
@@ -563,16 +582,16 @@ function selectRun(runIndex) {
     const mainContent = document.getElementById('mainContent');
     
     // Create button classes based on sidebar states
-    const annotationButtonClasses = annotationSidebarWasOpen 
+    const annotationButtonClasses = finalAnnotationSidebarOpen 
         ? 'flex items-center space-x-2 bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium border border-blue-600 transition-colors'
         : 'flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium border border-gray-300 transition-colors';
     
-    const metadataButtonClasses = metadataSidebarWasOpen 
+    const metadataButtonClasses = finalMetadataSidebarOpen 
         ? 'flex items-center space-x-2 bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium border border-blue-600 transition-colors'
         : 'flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium border border-gray-300 transition-colors';
     
     // Create span visibility based on sidebar states
-    const anySidebarOpen = annotationSidebarWasOpen || metadataSidebarWasOpen;
+    const anySidebarOpen = finalMetadataSidebarOpen || finalAnnotationSidebarOpen;
     const annotationSpanStyle = anySidebarOpen ? 'style="display: none;"' : '';
     const metadataSpanStyle = anySidebarOpen ? 'style="display: none;"' : '';
     
@@ -606,11 +625,11 @@ function selectRun(runIndex) {
     populateMetadataContent(selectedRun);
     
     // Restore sidebar states after updating content
-    if (metadataSidebarWasOpen && metadataSidebar) {
+    if (finalMetadataSidebarOpen && metadataSidebar) {
         metadataSidebar.classList.remove('hidden');
     }
     
-    if (annotationSidebarWasOpen && annotationSidebar) {
+    if (finalAnnotationSidebarOpen && annotationSidebar) {
         annotationSidebar.classList.remove('hidden');
         // Refresh annotation content using the component function
         populateAnnotationContent(selectedRun);
@@ -665,11 +684,8 @@ function populateMetadataContent(run) {
     // Add each metadata field
     metadataHtml += createMetadataRow('Stage', metadata.stage || '');
     metadataHtml += createMetadataRow('Type', metadata.type || '');
-    metadataHtml += createMetadataRow('Trace ID', run.trace_id || '');
-    metadataHtml += createMetadataRow('Span Kind', run.span_kind || '');
-    metadataHtml += createMetadataRow('Span Name', run.span_name || '');
-    metadataHtml += createMetadataRow('User ID', String(metadata.user_id || ''));
-    metadataHtml += createMetadataRow('Question ID', String(metadata.question_id || ''));
+    metadataHtml += createMetadataRow('User', String(metadata.user_email || ''));
+    metadataHtml += createMetadataRow('Question', String(metadata.question_title || ''));
     metadataHtml += createMetadataRow('Question Type', metadata.question_type || '');
     metadataHtml += createMetadataRow('Purpose', metadata.question_purpose || '');
     metadataHtml += createMetadataRow('Input Type', metadata.question_input_type || '');
@@ -687,7 +703,6 @@ function populateMetadataContent(run) {
     // Timing information
     metadataHtml += createMetadataRow('Start Time', formatTimestamp(run.start_time || ''));
     metadataHtml += createMetadataRow('End Time', formatTimestamp(run.end_time || ''));
-    metadataHtml += createMetadataRow('Uploaded by', run.uploaded_by || '');
     
     metadataContent.innerHTML = metadataHtml;
 }

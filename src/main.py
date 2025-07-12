@@ -101,6 +101,7 @@ def runs(request):
     """Runs page route - delegates to runs page with server-side data"""
     global app_data
     if not app_data:
+        print("No data loaded, redirecting to home")
         # If no data loaded, redirect to home to load data
         return RedirectResponse(url="/", status_code=302)
 
@@ -112,6 +113,7 @@ def queues(request):
     """Queues page route - delegates to queues page with server-side data"""
     global app_data
     if not app_data:
+        print("No data loaded, redirecting to home")
         # If no data loaded, redirect to home to load data
         return RedirectResponse(url="/", status_code=302)
     return queues_page(request, app_data)
@@ -122,6 +124,7 @@ def queue_detail(request, queue_id: str):
     """Individual queue page route - delegates to individual queue page with server-side data"""
     global app_data
     if not app_data:
+        print("No data loaded, redirecting to home")
         # If no data loaded, redirect to home to load data
         return RedirectResponse(url="/", status_code=302)
     return individual_queue_page(request, queue_id, app_data)

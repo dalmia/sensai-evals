@@ -16,6 +16,9 @@ def individual_queue_page(request, queue_id, app_data):
 
     user = get_current_user(request)
 
+    # Get taskId from query parameters for state restoration
+    task_id_param = request.query_params.get("taskId", "")
+
     # Use queues data from session (fallback to empty list if not available)
     queues = app_data.get("queues", [])
 
@@ -229,7 +232,7 @@ def individual_queue_page(request, queue_id, app_data):
         {queue_script}
         <script>
             // Initialize queue data
-            initializeQueueData({json.dumps({"queue": queue, "runs": runs, "user": user})});
+            initializeQueueData({json.dumps({"queue": queue, "runs": runs, "user": user, "selectedTaskId": task_id_param})});
         </script>
     </body>
     </html>

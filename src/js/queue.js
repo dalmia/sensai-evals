@@ -16,7 +16,28 @@ function initializeQueueData(data) {
     console.log('Selected annotator:', selectedAnnotator);
     updateRunsDisplay();
     
-    // Automatically select the first task if available
+    // Check if there's a taskId in URL to restore
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlTaskId = urlParams.get('taskId');
+    const selectedTaskId = data.selectedTaskId || '';
+    
+    if (urlTaskId && runsData.length > 0) {
+        // Find the run with matching taskId
+        const runIndex = runsData.findIndex(run => run.id === urlTaskId);
+        if (runIndex !== -1) {
+            selectRun(runIndex);
+            return;
+        }
+    } else if (selectedTaskId && runsData.length > 0) {
+        // Find the run with matching selectedTaskId from server
+        const runIndex = runsData.findIndex(run => run.id === selectedTaskId);
+        if (runIndex !== -1) {
+            selectRun(runIndex);
+            return;
+        }
+    }
+    
+    // Automatically select the first task if available and no URL task was found
     if (runsData.length > 0) {
         selectRun(0);
     }
@@ -141,6 +162,17 @@ function updateRunsDisplay() {
         displayRuns.length;
     queueHeader.textContent = queueName + ' (' + countText + ')';
     console.log('Updated header to:', queueHeader.textContent);
+    
+    // Restore task selection if one was selected from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlTaskId = urlParams.get('taskId');
+    if (urlTaskId) {
+        // Find the run with matching taskId and ensure it's visually selected
+        const runIndex = runsData.findIndex(run => run.id === urlTaskId);
+        if (runIndex !== -1) {
+            currentRunIndex = runIndex;
+        }
+    }
 }
 
 // Generate runs HTML
@@ -283,6 +315,14 @@ function filterByAnnotator(annotator) {
 
 // Function to select and display a run
 function selectRun(runIndex) {
+    // Update URL with task ID as query parameter
+    if (runsData[runIndex]) {
+        const taskId = runsData[runIndex].id;
+        const url = new URL(window.location);
+        url.searchParams.set('taskId', taskId);
+        window.history.pushState({}, '', url);
+    }
+    
     // Store current sidebar and button states before changing runs
     const metadataSidebar = document.getElementById('metadataSidebar');
     const annotationSidebar = document.getElementById('annotationSidebar');

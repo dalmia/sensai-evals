@@ -89,6 +89,22 @@ function getAnnotationStatus(run) {
 }
 
 function showQueueDetails(queueId) {
+    // Update URL with queue ID as query parameter
+    const url = new URL(window.location);
+    url.searchParams.set('queueId', queueId);
+    window.history.pushState({}, '', url);
+    
+    // Add visual selection state to queue items
+    document.querySelectorAll('[onclick*="showQueueDetails"]').forEach(item => {
+        item.classList.remove('bg-blue-50', 'border-l-blue-500');
+        item.classList.add('border-l-transparent');
+    });
+    const selectedItem = document.querySelector(`[onclick="showQueueDetails('${queueId}')"]`);
+    if (selectedItem) {
+        selectedItem.classList.add('bg-blue-50', 'border-l-blue-500');
+        selectedItem.classList.remove('border-l-transparent');
+    }
+    
     const queue = queuesData.find(q => q.id === queueId);
     
     if (!queue) return;
@@ -124,7 +140,7 @@ function showQueueDetails(queueId) {
             }
             
             runsHtml += `
-                <div class="border-b border-gray-100 px-6 py-4 hover:bg-gray-50 cursor-pointer">
+                <div class="border-b border-l-4 border-l-transparent border-gray-100 px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors" onclick="selectTask('${queueId}', '${run.id}')">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-3 flex-1">
                             ${annotationIcon}
@@ -199,6 +215,19 @@ function showQueueDetails(queueId) {
         // Update queue count in header
         const queueHeader = document.querySelector('h2');
         queueHeader.textContent = `${queue.name} (${displayRuns.length}${displayRuns.length !== runs.length ? ` of ${runs.length}` : ''})`;
+        
+        // Restore task selection if one was selected
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlTaskId = urlParams.get('taskId');
+        if (urlTaskId) {
+            setTimeout(() => {
+                const taskElement = document.querySelector(`[onclick="selectTask('${queueId}', '${urlTaskId}')"]`);
+                if (taskElement) {
+                    taskElement.classList.add('bg-blue-50', 'border-l-blue-500');
+                    taskElement.classList.remove('border-l-transparent');
+                }
+            }, 10);
+        }
     }
     
     // Function to get arrow based on current sort
@@ -254,7 +283,7 @@ function showQueueDetails(queueId) {
                             </div>
                         </div>
                         <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium" onclick="window.location.href='/queues/${queueId}'">
-                            Start Annotation
+                            Start annotation
                         </button>
                     </div>
                 </div>
@@ -285,6 +314,19 @@ function showQueueDetails(queueId) {
     
     document.getElementById('mainContent').innerHTML = content;
     
+    // Check if there's a task to restore from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlTaskId = urlParams.get('taskId');
+    if (urlTaskId) {
+        // Wait a bit for the DOM to be updated, then select the task
+        setTimeout(() => {
+            const taskElement = document.querySelector(`[onclick="selectTask('${queueId}', '${urlTaskId}')"]`);
+            if (taskElement) {
+                selectTask(queueId, urlTaskId);
+            }
+        }, 100);
+    }
+    
     // Add global sorting functions
     window.toggleTimestampSort = function() {
         currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc';
@@ -313,19 +355,67 @@ function showQueueDetails(queueId) {
     };
 }
 
+// Function to select a task and navigate to annotation page
+function selectTask(queueId, taskId) {
+    // Navigate to the queue annotation page with task ID
+    window.location.href = `/queues/${queueId}?taskId=${taskId}`;
+}
+
 function toggleDropdown() {
     const dropdown = document.getElementById('dropdown');
     dropdown.classList.toggle('hidden');
 }
 
-// Initialize queues data
+// Auto-restore queue selection when data is initialized
 function initializeQueuesData(data) {
+    let selectedQueueId = '';
+    let selectedTaskId = '';
+    
     // Handle both old format (array) and new format (object with queues and user)
     if (Array.isArray(data)) {
         queuesData = data;
     } else {
         queuesData = data.queues || [];
         currentUser = data.user || '';
+        selectedQueueId = data.selectedQueueId || '';
+        selectedTaskId = data.selectedTaskId || '';
+    }
+    
+    // First try to restore from URL, then fall back to server-provided selectedQueueId
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlQueueId = urlParams.get('queueId');
+    const urlTaskId = urlParams.get('taskId');
+    
+    if (urlQueueId && queuesData.length > 0) {
+        const queue = queuesData.find(q => q.id === urlQueueId);
+        if (queue) {
+            showQueueDetails(urlQueueId);
+            // Also restore task selection if taskId is present
+            if (urlTaskId) {
+                // Wait a bit for the DOM to be updated, then select the task
+                setTimeout(() => {
+                    const taskElement = document.querySelector(`[onclick="selectTask('${urlQueueId}', '${urlTaskId}')"]`);
+                    if (taskElement) {
+                        selectTask(urlQueueId, urlTaskId);
+                    }
+                }, 100);
+            }
+        }
+    } else if (selectedQueueId && queuesData.length > 0) {
+        const queue = queuesData.find(q => q.id === selectedQueueId);
+        if (queue) {
+            showQueueDetails(selectedQueueId);
+            // Also restore task selection if taskId is present
+            if (selectedTaskId) {
+                // Wait a bit for the DOM to be updated, then select the task
+                setTimeout(() => {
+                    const taskElement = document.querySelector(`[onclick="selectTask('${selectedQueueId}', '${selectedTaskId}')"]`);
+                    if (taskElement) {
+                        selectTask(selectedQueueId, selectedTaskId);
+                    }
+                }, 100);
+            }
+        }
     }
 }
 

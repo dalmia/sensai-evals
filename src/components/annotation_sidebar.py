@@ -76,6 +76,9 @@ def create_annotation_sidebar():
     <script>
         // Annotation sidebar specific functions
         
+        // Store original annotation state for comparison
+        let originalAnnotationState = null;
+        
         // Function to populate annotation content
         function populateAnnotationContent(run) {
             const annotationContent = document.getElementById('annotationContent');
@@ -84,11 +87,16 @@ def create_annotation_sidebar():
             const annotations = run.annotations || {};
             const currentUserAnnotation = annotations[selectedAnnotator] || {};
             
+            // Store original annotation state for comparison
+            originalAnnotationState = {
+                judgement: currentUserAnnotation.judgement || null,
+                notes: currentUserAnnotation.notes || ''
+            };
+            
             // Determine current annotation state
             const hasCorrect = currentUserAnnotation.judgement === 'correct';
             const hasWrong = currentUserAnnotation.judgement === 'wrong';
             const hasNotes = currentUserAnnotation.notes && currentUserAnnotation.notes.trim().length > 0;
-            const hasChanges = hasCorrect || hasWrong || hasNotes;
             
             // Determine navigation button states
             const canGoPrevious = currentRunIndex > 0;
@@ -133,9 +141,9 @@ def create_annotation_sidebar():
                     
                     <!-- Bottom Update Button -->
                     <button onclick="updateAnnotation()" 
-                            class="w-full py-3 px-4 rounded-lg font-medium text-white mb-6 transition-colors duration-200 ${hasChanges ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-300 cursor-not-allowed'}"
+                            class="w-full py-3 px-4 rounded-lg font-medium text-white mb-6 transition-colors duration-200 bg-gray-300 cursor-not-allowed"
                             id="updateAnnotationBtn2"
-                            ${hasChanges ? '' : 'disabled'}>
+                            disabled>
                         Update annotation
                     </button>
                     
@@ -170,6 +178,9 @@ def create_annotation_sidebar():
             `;
             
             annotationContent.innerHTML = annotationHtml;
+            
+            // Update button state after populating content
+            updateAnnotationState();
         }
         
         // Function to update annotation state (called when notes change)
@@ -180,15 +191,29 @@ def create_annotation_sidebar():
             const updateBtn = document.getElementById('updateAnnotationBtn');
             const updateBtn2 = document.getElementById('updateAnnotationBtn2');
             
-            const hasCorrect = correctBtn && correctBtn.className.includes('bg-green-500');
-            const hasWrong = wrongBtn && wrongBtn.className.includes('bg-red-500');
-            const hasNotes = notes && notes.trim().length > 0;
-            const hasChanges = hasCorrect || hasWrong || hasNotes;
+            // Get current judgement state
+            const currentJudgement = correctBtn && correctBtn.className.includes('bg-green-500') ? 'correct' :
+                                   wrongBtn && wrongBtn.className.includes('bg-red-500') ? 'wrong' : null;
+            
+            // Determine if changes warrant enabling the button
+            let shouldEnable = false;
+            
+            if (originalAnnotationState) {
+                // If no original judgement existed, only enable when a judgement is made
+                if (!originalAnnotationState.judgement) {
+                    shouldEnable = currentJudgement !== null;
+                } else {
+                    // If original judgement existed, enable when judgement changed OR notes changed
+                    const judgementChanged = currentJudgement !== originalAnnotationState.judgement;
+                    const notesChanged = notes !== originalAnnotationState.notes;
+                    shouldEnable = judgementChanged || notesChanged;
+                }
+            }
             
             // Update both button states
             [updateBtn, updateBtn2].forEach(btn => {
                 if (btn) {
-                    if (hasChanges) {
+                    if (shouldEnable) {
                         btn.className = 'w-full py-3 px-4 rounded-lg font-medium text-white mb-6 transition-colors duration-200 bg-blue-600 hover:bg-blue-700';
                         btn.disabled = false;
                     } else {

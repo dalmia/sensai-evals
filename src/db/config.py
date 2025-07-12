@@ -1,12 +1,12 @@
 import os
-from os.path import exists
+from os.path import exists, dirname, abspath
 
 
 if exists("/appdata"):
     data_root_dir = "/appdata"
 else:
-    root_dir = os.path.dirname(os.path.abspath(__file__))
-    data_root_dir = f"{root_dir}/db"
+    root_dir = dirname(abspath(__file__))
+    data_root_dir = f"{root_dir}"
 
 if not exists(data_root_dir):
     os.makedirs(data_root_dir)

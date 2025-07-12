@@ -19,10 +19,10 @@ def patch_db_path():
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp_file:
         db_path = tmp_file.name
 
-    # Patch both possible import paths
-    with patch("src.db.config.sqlite_db_path", db_path), patch(
-        "db.config.sqlite_db_path", db_path
-    ):
+    # Patch all possible locations where sqlite_db_path might be imported/used
+    with patch("db.config.sqlite_db_path", db_path), patch(
+        "src.db.config.sqlite_db_path", db_path
+    ), patch("src.db.sqlite_db_path", db_path):
         yield
 
     if os.path.exists(db_path):

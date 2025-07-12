@@ -181,7 +181,7 @@ function showQueueDetails(queueId) {
             }
             
             runsHtml += `
-                <div class="border-b border-l-4 border-l-transparent border-gray-100 px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors" onclick="selectTask('${queueId}', '${run.id}')">
+                <div class="border-b border-l-4 border-l-transparent border-gray-100 px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors" onclick="selectRun('${queueId}', '${run.id}')">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-3 flex-1">
                             ${annotationIcon}
@@ -267,15 +267,15 @@ function showQueueDetails(queueId) {
         // Update pagination
         updatePagination();
         
-        // Restore task selection if one was selected
+        // Restore run selection if one was selected
         const urlParams = new URLSearchParams(window.location.search);
         const urlRunId = urlParams.get('runId');
         if (urlRunId) {
             setTimeout(() => {
-                const taskElement = document.querySelector(`[onclick="selectTask('${queueId}', '${urlRunId}')"]`);
-                if (taskElement) {
-                    taskElement.classList.add('bg-blue-50', 'border-l-blue-500');
-                    taskElement.classList.remove('border-l-transparent');
+                const runElement = document.querySelector(`[onclick="selectRun('${queueId}', '${urlRunId}')"]`);
+                if (runElement) {
+                    runElement.classList.add('bg-blue-50', 'border-l-blue-500');
+                    runElement.classList.remove('border-l-transparent');
                 }
             }, 10);
         }
@@ -496,15 +496,15 @@ function showQueueDetails(queueId) {
     // Initialize pagination
     updatePagination();
     
-    // Check if there's a task to restore from URL
+    // Check if there's a run to restore from URL
     const urlParams = new URLSearchParams(window.location.search);
     const urlRunId = urlParams.get('runId');
     if (urlRunId) {
-        // Wait a bit for the DOM to be updated, then select the task
+        // Wait a bit for the DOM to be updated, then select the run
         setTimeout(() => {
-            const taskElement = document.querySelector(`[onclick="selectTask('${queueId}', '${urlRunId}')"]`);
-            if (taskElement) {
-                selectTask(queueId, urlRunId);
+            const runElement = document.querySelector(`[onclick="selectRun('${queueId}', '${urlRunId}')"]`);
+            if (runElement) {
+                selectRun(queueId, urlRunId);
             }
         }, 100);
     }
@@ -542,9 +542,9 @@ function showQueueDetails(queueId) {
     window.nextPage = nextPage;
 }
 
-// Function to select a task and navigate to annotation page
-function selectTask(queueId, runId) {
-    // Navigate to the queue annotation page with task ID
+// Function to select a run and navigate to annotation page
+function selectRun(queueId, runId) {
+    // Navigate to the queue annotation page with run ID
     window.location.href = `/queues/${queueId}?runId=${runId}`;
 }
 
@@ -556,7 +556,7 @@ function toggleDropdown() {
 // Auto-restore queue selection when data is initialized
 function initializeQueuesData(data) {
     let selectedQueueId = '';
-    let selectedTaskId = '';
+    let selectedRunId = '';
     
     // Handle both old format (array) and new format (object with queues and user)
     if (Array.isArray(data)) {
@@ -565,7 +565,7 @@ function initializeQueuesData(data) {
         queuesData = data.queues || [];
         currentUser = data.user || '';
         selectedQueueId = data.selectedQueueId || '';
-        selectedTaskId = data.selectedTaskId || '';
+        selectedRunId = data.selectedRunId || '';
     }
     
     // Reset pagination variables
@@ -582,13 +582,13 @@ function initializeQueuesData(data) {
         const queue = queuesData.find(q => q.id === urlQueueId);
         if (queue) {
             showQueueDetails(urlQueueId);
-            // Also restore task selection if runId is present
+            // Also restore run selection if runId is present
             if (urlRunId) {
-                // Wait a bit for the DOM to be updated, then select the task
+                // Wait a bit for the DOM to be updated, then select the run
                 setTimeout(() => {
-                    const taskElement = document.querySelector(`[onclick="selectTask('${urlQueueId}', '${urlRunId}')"]`);
-                    if (taskElement) {
-                        selectTask(urlQueueId, urlRunId);
+                    const runElement = document.querySelector(`[onclick="selectRun('${urlQueueId}', '${urlRunId}')"]`);
+                    if (runElement) {
+                        selectRun(urlQueueId, urlRunId);
                     }
                 }, 100);
             }
@@ -597,13 +597,13 @@ function initializeQueuesData(data) {
         const queue = queuesData.find(q => q.id === selectedQueueId);
         if (queue) {
             showQueueDetails(selectedQueueId);
-            // Also restore task selection if runId is present
-            if (selectedTaskId) {
-                // Wait a bit for the DOM to be updated, then select the task
+            // Also restore run selection if runId is present
+            if (selectedRunId) {
+                // Wait a bit for the DOM to be updated, then select the run
                 setTimeout(() => {
-                    const taskElement = document.querySelector(`[onclick="selectTask('${selectedQueueId}', '${selectedTaskId}')"]`);
-                    if (taskElement) {
-                        selectTask(selectedQueueId, selectedTaskId);
+                    const runElement = document.querySelector(`[onclick="selectRun('${selectedQueueId}', '${selectedRunId}')"]`);
+                    if (runElement) {
+                        selectRun(selectedQueueId, selectedRunId);
                     }
                 }, 100);
             }

@@ -1,7 +1,5 @@
 from auth import require_auth, get_current_user
 from components.header import create_header
-from components.queue_run_row import create_simple_queue_run_row
-from components.task_detail import create_task_detail
 from components.annotation_sidebar import create_annotation_sidebar
 from components.metadata_sidebar import create_metadata_sidebar
 from fasthtml.common import ScriptX
@@ -246,8 +244,8 @@ def individual_queue_page(request, queue_id, app_data):
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                             </svg>
                         </div>
-                        <h3 class="text-lg font-medium text-gray-900 mb-2">No task selected</h3>
-                        <p class="text-sm text-gray-500">Select a task from the queue to view its details</p>
+                        <h3 class="text-lg font-medium text-gray-900 mb-2">No run selected</h3>
+                        <p class="text-sm text-gray-500">Select a run from the queue to view its details</p>
                     </div>
                 </div>
             </div>
@@ -260,7 +258,7 @@ def individual_queue_page(request, queue_id, app_data):
         {queue_script}
         <script>
             // Initialize queue data
-            initializeQueueData({json.dumps({"queue": queue, "runs": runs, "user": user, "selectedTaskId": run_id_param})});
+            initializeQueueData({json.dumps({"queue": queue, "runs": runs, "user": user, "selectedRunId": run_id_param})});
         </script>
     </body>
     </html>

@@ -71,7 +71,7 @@ def queues_page(request, app_data):
         "queues": queues,
         "user": user,
         "selectedQueueId": queue_id_param,
-        "selectedTaskId": run_id_param,
+        "selectedRunId": run_id_param,
     }
     init_data_json = json.dumps(init_data)
 
@@ -128,7 +128,7 @@ def queues_page(request, app_data):
                             </svg>
                         </div>
                         <h3 class="text-lg font-medium text-gray-900 mb-2">No queue selected</h3>
-                        <p class="text-sm text-gray-500">Select an annotation queue from the list to view and annotate its tasks</p>
+                        <p class="text-sm text-gray-500">Select an annotation queue from the list to view and annotate its runs</p>
                     </div>
                 </div>
             </div>

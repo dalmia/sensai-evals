@@ -16,7 +16,7 @@ function initializeQueueData(data) {
     // Check if there's a runId in URL to restore
     const urlParams = new URLSearchParams(window.location.search);
     const urlRunId = urlParams.get('runId');
-    const selectedTaskId = data.selectedTaskId || '';
+    const selectedRunId = data.selectedRunId || '';
     
     if (urlRunId && runsData.length > 0) {
         // Find the run with matching runId
@@ -25,16 +25,16 @@ function initializeQueueData(data) {
             selectRun(runIndex);
             return;
         }
-    } else if (selectedTaskId && runsData.length > 0) {
-        // Find the run with matching selectedTaskId from server
-        const runIndex = runsData.findIndex(run => run.id === selectedTaskId);
+    } else if (selectedRunId && runsData.length > 0) {
+        // Find the run with matching selectedRunId from server
+        const runIndex = runsData.findIndex(run => run.id === selectedRunId);
         if (runIndex !== -1) {
             selectRun(runIndex);
             return;
         }
     }
     
-    // Automatically select the first task if available and no URL task was found
+    // Automatically select the first run if available and no URL run was found
     if (runsData.length > 0) {
         selectRun(0);
     }
@@ -186,7 +186,7 @@ function updateRunsDisplay() {
         displayRuns.length;
     queueHeader.textContent = queueName + ' (' + countText + ')';
     
-    // Restore task selection if one was selected from URL
+    // Restore run selection if one was selected from URL
     const urlParams = new URLSearchParams(window.location.search);
     const urlRunId = urlParams.get('runId');
     if (urlRunId) {
@@ -211,7 +211,7 @@ function generateRunsHTML(sortedRuns) {
         // Find the original index of this run in the runsData array
         const originalIndex = runsData.findIndex(r => r.id === run.id);
         
-        // Determine if this is the selected task
+        // Determine if this is the selected run
         const isSelected = originalIndex === currentRunIndex;
         const selectedClasses = isSelected ? 'border-l-4 border-l-blue-500 bg-blue-50' : '';
         
@@ -330,7 +330,7 @@ function filterByAnnotator(annotator) {
 
 // Function to select and display a run
 function selectRun(runIndex) {
-    // Update URL with task ID as query parameter
+    // Update URL with run ID as query parameter
     if (runsData[runIndex]) {
         const runId = runsData[runIndex].id;
         const url = new URL(window.location);

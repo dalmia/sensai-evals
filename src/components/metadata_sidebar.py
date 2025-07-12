@@ -7,7 +7,7 @@ def create_metadata_sidebar():
             <div id="metadataContent">
                 <!-- Metadata will be populated by JavaScript -->
                 <div class="text-center text-gray-500 py-8">
-                    <p>Select a task to view its metadata</p>
+                    <p>Select a run to view its metadata</p>
                 </div>
             </div>
         </div>

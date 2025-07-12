@@ -8,7 +8,7 @@ def create_annotation_sidebar():
                 <!-- Annotation content will be populated by JavaScript -->
                 <div class="flex items-center justify-center h-full">
                     <div class="text-center text-gray-500">
-                        <p>Select a task to view its annotations</p>
+                        <p>Select a run to view its annotations</p>
                     </div>
                 </div>
             </div>

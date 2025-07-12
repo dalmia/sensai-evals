@@ -1,6 +1,12 @@
 let queuesData = [];
 let currentUser = '';
 
+// Pagination variables for queue details
+let currentPage = 1;
+let pageSize = 20;
+let totalPages = 1;
+let currentQueueRuns = [];
+
 // Helper function to format ISO timestamp to human readable format
 function formatTimestamp(isoTimestamp) {
     try {
@@ -25,20 +31,51 @@ function getRunName(run) {
     const courseName = metadata.course?.name || '';
     const milestoneName = metadata.milestone?.name || '';
     const orgName = metadata.org?.name || '';
-    
-    let runName;
+    const taskTitle = metadata.task_title || '';
+    const questionTitle = metadata.question_title || '';
+    const runType = metadata.type || '';
+
+    let runName = '';
+
+    // Start with task title if available
+    if (taskTitle) {
+        runName = taskTitle;
+    }
+
+    // For quiz types, add question title after task title
+    if (runType === 'quiz' && questionTitle) {
+        if (runName) {
+            runName += ` - ${questionTitle}`;
+        } else {
+            runName = questionTitle;
+        }
+    }
+
+    // Add course and milestone information
     if (courseName && milestoneName) {
-        runName = `${courseName} - ${milestoneName}`;
+        if (runName) {
+            runName += ` - ${courseName} - ${milestoneName}`;
+        } else {
+            runName = `${courseName} - ${milestoneName}`;
+        }
     } else if (courseName) {
-        runName = courseName;
-    } else {
+        if (runName) {
+            runName += ` - ${courseName}`;
+        } else {
+            runName = courseName;
+        }
+    }
+
+    // If no meaningful name constructed, use run ID
+    if (!runName) {
         runName = `Run ${runId}`;
     }
-    
+
+    // Add organization name at the end
     if (orgName) {
         runName = `${runName} (${orgName})`;
     }
-    
+
     return runName;
 }
 
@@ -106,16 +143,20 @@ function showQueueDetails(queueId) {
     }
     
     const queue = queuesData.find(q => q.id === queueId);
-    
+
     if (!queue) return;
     
     // Get runs directly from queue.runs
     const runs = queue.runs || [];
-    
+    currentQueueRuns = runs;
+    totalPages = Math.ceil(runs.length / pageSize);
+    currentPage = 1;
+
     // Generate runs HTML with sorting functionality
-    function generateRunsHTML(sortedRuns) {
+    function generateRunsHTML(sortedRuns, startIndex) {
         let runsHtml = '';
-        sortedRuns.forEach(run => {
+        for (let i = 0; i < sortedRuns.length; i++) {
+            const run = sortedRuns[i];
             const annotation = getAnnotationStatus(run);
             const runName = getRunName(run);
             const timestamp = formatTimestamp(run.start_time);
@@ -162,7 +203,7 @@ function showQueueDetails(queueId) {
                     </div>
                 </div>
             `;
-        });
+        }
         return runsHtml;
     }
     
@@ -207,21 +248,31 @@ function showQueueDetails(queueId) {
         return sortRuns(filteredRuns, currentSort.by, currentSort.order);
     }
     
-    // Function to update the runs display
+    // Function to update the runs display with pagination
     function updateRunsDisplay() {
-        const displayRuns = getFilteredAndSortedRuns();
-        document.getElementById(`runsList-${queueId}`).innerHTML = generateRunsHTML(displayRuns);
+        const allFilteredRuns = getFilteredAndSortedRuns();
+        totalPages = Math.ceil(allFilteredRuns.length / pageSize);
+        
+        // Calculate pagination slice
+        const startIndex = (currentPage - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+        const currentPageRuns = allFilteredRuns.slice(startIndex, endIndex);
+        
+        document.getElementById(`runsList-${queueId}`).innerHTML = generateRunsHTML(currentPageRuns, startIndex);
         
         // Update queue count in header
         const queueHeader = document.querySelector('h2');
-        queueHeader.textContent = `${queue.name} (${displayRuns.length}${displayRuns.length !== runs.length ? ` of ${runs.length}` : ''})`;
+        queueHeader.textContent = `${queue.name} (${allFilteredRuns.length}${allFilteredRuns.length !== runs.length ? ` of ${runs.length}` : ''})`;
+        
+        // Update pagination
+        updatePagination();
         
         // Restore task selection if one was selected
         const urlParams = new URLSearchParams(window.location.search);
-        const urlTaskId = urlParams.get('taskId');
-        if (urlTaskId) {
+        const urlRunId = urlParams.get('runId');
+        if (urlRunId) {
             setTimeout(() => {
-                const taskElement = document.querySelector(`[onclick="selectTask('${queueId}', '${urlTaskId}')"]`);
+                const taskElement = document.querySelector(`[onclick="selectTask('${queueId}', '${urlRunId}')"]`);
                 if (taskElement) {
                     taskElement.classList.add('bg-blue-50', 'border-l-blue-500');
                     taskElement.classList.remove('border-l-transparent');
@@ -255,14 +306,118 @@ function showQueueDetails(queueId) {
         `;
     }
     
+    // Pagination functions
+    function updatePagination() {
+        const paginationInfo = document.getElementById(`paginationInfo-${queueId}`);
+        const totalRunsCount = document.getElementById(`totalRunsCount-${queueId}`);
+        const prevPageBtn = document.getElementById(`prevPageBtn-${queueId}`);
+        const nextPageBtn = document.getElementById(`nextPageBtn-${queueId}`);
+        const pageNumbers = document.getElementById(`pageNumbers-${queueId}`);
+        
+        if (!paginationInfo || !totalRunsCount || !prevPageBtn || !nextPageBtn || !pageNumbers) {
+            return;
+        }
+        
+        const allFilteredRuns = getFilteredAndSortedRuns();
+        
+        // Update pagination info
+        const startIndex = (currentPage - 1) * pageSize + 1;
+        const endIndex = Math.min(currentPage * pageSize, allFilteredRuns.length);
+        paginationInfo.textContent = `${startIndex}-${endIndex}`;
+        totalRunsCount.textContent = allFilteredRuns.length;
+        
+        // Update navigation buttons
+        prevPageBtn.disabled = currentPage === 1;
+        nextPageBtn.disabled = currentPage === totalPages;
+        
+        // Generate page numbers
+        generatePageNumbers(pageNumbers);
+    }
+    
+    function generatePageNumbers(container) {
+        container.innerHTML = '';
+        
+        if (totalPages <= 1) {
+            return;
+        }
+        
+        const maxVisiblePages = 5;
+        let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+        
+        // Adjust start page if we're near the end
+        if (endPage - startPage + 1 < maxVisiblePages) {
+            startPage = Math.max(1, endPage - maxVisiblePages + 1);
+        }
+        
+        // Add first page and ellipsis if needed
+        if (startPage > 1) {
+            addPageButton(container, 1, false);
+            if (startPage > 2) {
+                addEllipsis(container);
+            }
+        }
+        
+        // Add page numbers
+        for (let i = startPage; i <= endPage; i++) {
+            addPageButton(container, i, i === currentPage);
+        }
+        
+        // Add last page and ellipsis if needed
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                addEllipsis(container);
+            }
+            addPageButton(container, totalPages, false);
+        }
+    }
+    
+    function addPageButton(container, pageNum, isActive) {
+        const button = document.createElement('button');
+        button.textContent = pageNum;
+        button.onclick = () => goToPage(pageNum);
+        button.className = `px-3 py-2 text-sm font-medium rounded-md ${
+            isActive 
+                ? 'bg-blue-600 text-white' 
+                : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
+        }`;
+        container.appendChild(button);
+    }
+    
+    function addEllipsis(container) {
+        const span = document.createElement('span');
+        span.textContent = '...';
+        span.className = 'px-3 py-2 text-sm text-gray-500';
+        container.appendChild(span);
+    }
+    
+    function goToPage(pageNum) {
+        if (pageNum >= 1 && pageNum <= totalPages && pageNum !== currentPage) {
+            currentPage = pageNum;
+            updateRunsDisplay();
+        }
+    }
+    
+    function previousPage() {
+        if (currentPage > 1) {
+            goToPage(currentPage - 1);
+        }
+    }
+    
+    function nextPage() {
+        if (currentPage < totalPages) {
+            goToPage(currentPage + 1);
+        }
+    }
+    
     const content = `
-        <div>
+        <div class="flex flex-col h-full">
             <!-- Header -->
             <div class="bg-white border-b border-t border-gray-200 px-6 py-4">
                 <div class="flex justify-between items-center">
                     <div class="flex flex-col">
                         <h2 class="text-lg font-semibold text-gray-900">${queue.name} (${runs.length})</h2>
-                        <span class="text-sm text-gray-500">Created by ${queue.created_by}</span>
+                        <span class="text-sm text-gray-500">Created by ${queue.user_name}</span>
                     </div>
                     <div class="flex items-center space-x-2">
                         <!-- Filter Dropdown -->
@@ -289,6 +444,30 @@ function showQueueDetails(queueId) {
                 </div>
             </div>
             
+            <!-- Pagination -->
+            <div class="bg-white border-b border-gray-200 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm text-gray-700">Showing</span>
+                        <span id="paginationInfo-${queueId}" class="text-sm font-medium text-gray-900">1-20</span>
+                        <span class="text-sm text-gray-700">of</span>
+                        <span id="totalRunsCount-${queueId}" class="text-sm font-medium text-gray-900">${runs.length}</span>
+                        <span class="text-sm text-gray-700">runs</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button id="prevPageBtn-${queueId}" onclick="previousPage()" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                            Previous
+                        </button>
+                        <div id="pageNumbers-${queueId}" class="flex items-center space-x-1">
+                            <!-- Page numbers will be generated here -->
+                        </div>
+                        <button id="nextPageBtn-${queueId}" onclick="nextPage()" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                            Next
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Table Header -->
             <div class="bg-gray-50 border-b border-gray-200 px-6 py-3">
                 <div class="flex items-center justify-between">
@@ -306,23 +485,26 @@ function showQueueDetails(queueId) {
             </div>
             
             <!-- Queue Runs List -->
-            <div class="bg-white" id="runsList-${queueId}">
-                ${generateRunsHTML(sortedRuns)}
+            <div class="bg-white flex-1 overflow-y-auto" id="runsList-${queueId}">
+                ${generateRunsHTML(sortedRuns.slice(0, pageSize), 0)}
             </div>
         </div>
     `;
     
     document.getElementById('mainContent').innerHTML = content;
     
+    // Initialize pagination
+    updatePagination();
+    
     // Check if there's a task to restore from URL
     const urlParams = new URLSearchParams(window.location.search);
-    const urlTaskId = urlParams.get('taskId');
-    if (urlTaskId) {
+    const urlRunId = urlParams.get('runId');
+    if (urlRunId) {
         // Wait a bit for the DOM to be updated, then select the task
         setTimeout(() => {
-            const taskElement = document.querySelector(`[onclick="selectTask('${queueId}', '${urlTaskId}')"]`);
+            const taskElement = document.querySelector(`[onclick="selectTask('${queueId}', '${urlRunId}')"]`);
             if (taskElement) {
-                selectTask(queueId, urlTaskId);
+                selectTask(queueId, urlRunId);
             }
         }, 100);
     }
@@ -330,7 +512,7 @@ function showQueueDetails(queueId) {
     // Add global sorting functions
     window.toggleTimestampSort = function() {
         currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc';
-        sortedRuns = sortRuns(runs, currentSort.by, currentSort.order);
+        currentPage = 1; // Reset to first page when sorting changes
         updateRunsDisplay();
         updateHeader();
     };
@@ -351,14 +533,19 @@ function showQueueDetails(queueId) {
         };
         document.getElementById(`currentFilter-${queueId}`).textContent = filterLabels[filter];
         document.getElementById(`annotationFilterDropdown-${queueId}`).classList.add('hidden');
+        currentPage = 1; // Reset to first page when filtering
         updateRunsDisplay();
     };
+    
+    // Add global pagination functions
+    window.previousPage = previousPage;
+    window.nextPage = nextPage;
 }
 
 // Function to select a task and navigate to annotation page
-function selectTask(queueId, taskId) {
+function selectTask(queueId, runId) {
     // Navigate to the queue annotation page with task ID
-    window.location.href = `/queues/${queueId}?taskId=${taskId}`;
+    window.location.href = `/queues/${queueId}?runId=${runId}`;
 }
 
 function toggleDropdown() {
@@ -381,22 +568,27 @@ function initializeQueuesData(data) {
         selectedTaskId = data.selectedTaskId || '';
     }
     
+    // Reset pagination variables
+    currentPage = 1;
+    totalPages = 1;
+    currentQueueRuns = [];
+    
     // First try to restore from URL, then fall back to server-provided selectedQueueId
     const urlParams = new URLSearchParams(window.location.search);
     const urlQueueId = urlParams.get('queueId');
-    const urlTaskId = urlParams.get('taskId');
+    const urlRunId = urlParams.get('runId');
     
     if (urlQueueId && queuesData.length > 0) {
         const queue = queuesData.find(q => q.id === urlQueueId);
         if (queue) {
             showQueueDetails(urlQueueId);
-            // Also restore task selection if taskId is present
-            if (urlTaskId) {
+            // Also restore task selection if runId is present
+            if (urlRunId) {
                 // Wait a bit for the DOM to be updated, then select the task
                 setTimeout(() => {
-                    const taskElement = document.querySelector(`[onclick="selectTask('${urlQueueId}', '${urlTaskId}')"]`);
+                    const taskElement = document.querySelector(`[onclick="selectTask('${urlQueueId}', '${urlRunId}')"]`);
                     if (taskElement) {
-                        selectTask(urlQueueId, urlTaskId);
+                        selectTask(urlQueueId, urlRunId);
                     }
                 }, 100);
             }
@@ -405,7 +597,7 @@ function initializeQueuesData(data) {
         const queue = queuesData.find(q => q.id === selectedQueueId);
         if (queue) {
             showQueueDetails(selectedQueueId);
-            // Also restore task selection if taskId is present
+            // Also restore task selection if runId is present
             if (selectedTaskId) {
                 // Wait a bit for the DOM to be updated, then select the task
                 setTimeout(() => {
@@ -429,6 +621,9 @@ function filterByAnnotator(annotator) {
     currentUser = annotator;
     document.getElementById('currentAnnotator').textContent = annotator;
     document.getElementById('annotatorFilterDropdown').classList.add('hidden');
+    
+    // Reset pagination when switching annotators
+    currentPage = 1;
     
     // Re-render the current queue details if one is selected
     const mainContent = document.getElementById('mainContent');

@@ -11,19 +11,16 @@ function initializeQueueData(data) {
     queueData = data.queue;
     runsData = data.runs;
     selectedAnnotator = data.user; // Set default annotator to logged-in user
-    console.log('Queue data:', queueData);
-    console.log('Runs data:', runsData);
-    console.log('Selected annotator:', selectedAnnotator);
     updateRunsDisplay();
     
-    // Check if there's a taskId in URL to restore
+    // Check if there's a runId in URL to restore
     const urlParams = new URLSearchParams(window.location.search);
-    const urlTaskId = urlParams.get('taskId');
+    const urlRunId = urlParams.get('runId');
     const selectedTaskId = data.selectedTaskId || '';
     
-    if (urlTaskId && runsData.length > 0) {
-        // Find the run with matching taskId
-        const runIndex = runsData.findIndex(run => run.id === urlTaskId);
+    if (urlRunId && runsData.length > 0) {
+        // Find the run with matching runId
+        const runIndex = runsData.findIndex(run => run.id === Number(urlRunId));
         if (runIndex !== -1) {
             selectRun(runIndex);
             return;
@@ -68,20 +65,51 @@ function getRunName(run) {
     const courseName = metadata.course?.name || '';
     const milestoneName = metadata.milestone?.name || '';
     const orgName = metadata.org?.name || '';
-    
-    let runName;
+    const taskTitle = metadata.task_title || '';
+    const questionTitle = metadata.question_title || '';
+    const runType = metadata.type || '';
+
+    let runName = '';
+
+    // Start with task title if available
+    if (taskTitle) {
+        runName = taskTitle;
+    }
+
+    // For quiz types, add question title after task title
+    if (runType === 'quiz' && questionTitle) {
+        if (runName) {
+            runName += ` - ${questionTitle}`;
+        } else {
+            runName = questionTitle;
+        }
+    }
+
+    // Add course and milestone information
     if (courseName && milestoneName) {
-        runName = `${courseName} - ${milestoneName}`;
+        if (runName) {
+            runName += ` - ${courseName} - ${milestoneName}`;
+        } else {
+            runName = `${courseName} - ${milestoneName}`;
+        }
     } else if (courseName) {
-        runName = courseName;
-    } else {
+        if (runName) {
+            runName += ` - ${courseName}`;
+        } else {
+            runName = courseName;
+        }
+    }
+
+    // If no meaningful name constructed, use run ID
+    if (!runName) {
         runName = `Run ${runId}`;
     }
-    
+
+    // Add organization name at the end
     if (orgName) {
         runName = `${runName} (${orgName})`;
     }
-    
+
     return runName;
 }
 
@@ -131,7 +159,6 @@ function createTagBadges(metadata) {
 
 // Function to filter runs by annotation status
 function filterRuns(runs, filter) {
-    console.log('Filtering runs by:', filter);
     if (filter === 'all') return runs;
     if (filter === 'empty') return runs.filter(run => getAnnotationStatus(run) === null);
     if (filter === 'correct') return runs.filter(run => getAnnotationStatus(run) === 'correct');
@@ -142,15 +169,12 @@ function filterRuns(runs, filter) {
 // Function to get filtered and sorted runs
 function getFilteredAndSortedRuns() {
     let filteredRuns = filterRuns(runsData, currentFilter);
-    console.log('Filtered runs:', filteredRuns);
     let sortedRuns = sortRuns(filteredRuns, currentSort.by, currentSort.order);
-    console.log('Sorted runs:', sortedRuns);
     return sortedRuns;
 }
 
 // Function to update the runs display and queue count
 function updateRunsDisplay() {
-    console.log('Updating runs display');
     const displayRuns = getFilteredAndSortedRuns();
     document.getElementById('runsList').innerHTML = generateRunsHTML(displayRuns);
     
@@ -161,14 +185,13 @@ function updateRunsDisplay() {
         displayRuns.length + ' of ' + runsData.length : 
         displayRuns.length;
     queueHeader.textContent = queueName + ' (' + countText + ')';
-    console.log('Updated header to:', queueHeader.textContent);
     
     // Restore task selection if one was selected from URL
     const urlParams = new URLSearchParams(window.location.search);
-    const urlTaskId = urlParams.get('taskId');
-    if (urlTaskId) {
-        // Find the run with matching taskId and ensure it's visually selected
-        const runIndex = runsData.findIndex(run => run.id === urlTaskId);
+    const urlRunId = urlParams.get('runId');
+    if (urlRunId) {
+        // Find the run with matching runId and ensure it's visually selected
+        const runIndex = runsData.findIndex(run => run.id === urlRunId);
         if (runIndex !== -1) {
             currentRunIndex = runIndex;
         }
@@ -177,7 +200,6 @@ function updateRunsDisplay() {
 
 // Generate runs HTML
 function generateRunsHTML(sortedRuns) {
-    console.log('Generating HTML for runs:', sortedRuns);
     let runsHtml = '';
     for (let i = 0; i < sortedRuns.length; i++) {
         const run = sortedRuns[i];
@@ -229,13 +251,11 @@ function generateRunsHTML(sortedRuns) {
             '</div>' +
         '</div>';
     }
-    console.log('Generated HTML length:', runsHtml.length);
     return runsHtml;
 }
 
 // Sorting function
 function sortRuns(runs, sortBy, sortOrder) {
-    console.log('Sorting runs by:', sortBy, sortOrder);
     return runs.slice().sort(function(a, b) {
         let aValue, bValue;
         
@@ -268,7 +288,6 @@ function updateArrow() {
 
 // Toggle timestamp sort
 function toggleTimestampSort() {
-    console.log('Toggling timestamp sort');
     currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc';
     updateRunsDisplay();
     updateArrow();
@@ -276,21 +295,18 @@ function toggleTimestampSort() {
 
 // Toggle annotation filter dropdown
 function toggleAnnotationFilter() {
-    console.log('Toggling annotation filter');
     const dropdown = document.getElementById('annotationFilterDropdown');
     dropdown.classList.toggle('hidden');
 }
 
 // Toggle annotator filter dropdown
 function toggleAnnotatorFilter() {
-    console.log('Toggling annotator filter');
     const dropdown = document.getElementById('annotatorFilterDropdown');
     dropdown.classList.toggle('hidden');
 }
 
 // Filter by annotation status
 function filterByAnnotation(filter) {
-    console.log('Filtering by annotation:', filter);
     currentFilter = filter;
     const filterLabels = {
         'all': 'All',
@@ -305,7 +321,6 @@ function filterByAnnotation(filter) {
 
 // Filter by annotator
 function filterByAnnotator(annotator) {
-    console.log('Filtering by annotator:', annotator);
     selectedAnnotator = annotator; // Update selectedAnnotator
     document.getElementById('currentAnnotator').textContent = annotator;
     document.getElementById('annotatorFilterDropdown').classList.add('hidden');
@@ -317,9 +332,9 @@ function filterByAnnotator(annotator) {
 function selectRun(runIndex) {
     // Update URL with task ID as query parameter
     if (runsData[runIndex]) {
-        const taskId = runsData[runIndex].id;
+        const runId = runsData[runIndex].id;
         const url = new URL(window.location);
-        url.searchParams.set('taskId', taskId);
+        url.searchParams.set('runId', runId);
         window.history.pushState({}, '', url);
     }
     
@@ -363,7 +378,7 @@ function selectRun(runIndex) {
     }
     
     // Extract context and messages
-    const context = selectedRun.context;
+    const context = metadata.context || '';
     const messages = selectedRun.messages;
     
     // Generate messages HTML
@@ -374,20 +389,19 @@ function selectRun(runIndex) {
         
         if (role === 'user') {
             messagesHtml += '<div class="mb-6">' +
-                '<div class="bg-blue-50 border border-blue-200 p-4 rounded-lg max-w-2xl">' +
-                '<div class="text-sm font-medium text-blue-800 mb-2">User</div>' +
-                '<div class="text-sm text-blue-900 whitespace-pre-wrap">' + content + '</div>' +
+                '<div class="bg-blue-500 text-white p-4 rounded-lg w-full">' +
+                '<div class="text-sm font-medium mb-2">User</div>' +
+                '<div class="text-sm font-medium mb-2">Student\'s Response:</div>' +
+                '<div class="whitespace-pre-wrap">' + content + '</div>' +
                 '</div>' +
                 '</div>';
         } else if (role === 'assistant') {
-            // Check if this is an objective question (has scorecard structure)
-            if (typeof content === 'object' && content !== null && 
-                (content.feedback || content.scorecard || content.is_correct !== undefined)) {
-                
-                // Handle objective questions with tabbed interface
-                let feedback = content.feedback || '';
-                let scorecard = content.scorecard || {};
-                let isCorrect = content.is_correct;
+            // Handle assistant messages based on question type and content structure
+            if (questionType === 'objective' && typeof content === 'object' && content !== null) {
+                // For objective questions, show feedback and analysis tabs
+                const feedback = content.feedback || '';
+                const analysis = content.analysis || '';
+                const isCorrect = content.is_correct;
                 
                 // Status indicator
                 let indicatorHtml = '';
@@ -405,25 +419,108 @@ function selectRun(runIndex) {
                         '</div>';
                 }
                 
-                // Generate scorecard HTML
-                let scorecardHtml = '';
-                if (scorecard && typeof scorecard === 'object') {
-                    for (const [key, value] of Object.entries(scorecard)) {
-                        if (key && value !== undefined) {
-                            let displayValue = value;
-                            if (typeof value === 'boolean') {
-                                displayValue = value ? 'Yes' : 'No';
-                            } else if (typeof value === 'number') {
-                                displayValue = value.toString();
-                            }
-                            
-                            scorecardHtml += '<div class="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0">' +
-                                '<span class="text-sm font-medium text-gray-600">' + key + '</span>' +
-                                '<span class="text-sm text-gray-900">' + displayValue + '</span>' +
-                                '</div>';
-                        }
+                messagesHtml += '<div class="mb-6">' +
+                    '<div class="bg-gray-50 border border-gray-200 p-4 rounded-lg w-full">' +
+                    '<div class="flex items-center gap-2 mb-2">' +
+                    '<span class="text-sm font-medium text-gray-700">Assistant</span>' +
+                    indicatorHtml +
+                    '</div>' +
+                    '<div class="mb-4">' +
+                    '<div class="flex space-x-4 border-b border-gray-200">' +
+                    '<button class="pb-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600 tab-button" onclick="showTab(\'feedback-' + index + '\', this)">' +
+                    'Feedback' +
+                    '</button>' +
+                    '<button class="pb-2 text-sm font-medium text-gray-500 tab-button" onclick="showTab(\'analysis-' + index + '\', this)">' +
+                    'Analysis' +
+                    '</button>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div id="feedback-' + index + '" class="tab-content">' +
+                    '<div class="whitespace-pre-wrap text-sm">' + feedback + '</div>' +
+                    '</div>' +
+                    '<div id="analysis-' + index + '" class="tab-content hidden">' +
+                    '<div class="whitespace-pre-wrap text-sm">' + analysis + '</div>' +
+                    '</div>' +
+                    '</div>' +
+                    '</div>';
+            } else if (questionType === 'subjective' && typeof content === 'object' && content !== null) {
+                // For subjective questions, show feedback and scorecard tabs
+                const feedback = content.feedback || '';
+                const scorecard = content.scorecard || [];
+                
+                // Check if all criteria passed
+                let allPassed = true;
+                for (let i = 0; i < scorecard.length; i++) {
+                    const criterion = scorecard[i];
+                    const score = criterion.score || 0;
+                    const passScore = criterion.pass_score || 0;
+                    if (score < passScore) {
+                        allPassed = false;
+                        break;
                     }
                 }
+                
+                // Status indicator based on all criteria passing
+                let indicatorHtml = '';
+                if (allPassed) {
+                    indicatorHtml = '<div class="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">' +
+                        '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>' +
+                        '</svg>' +
+                        '</div>';
+                } else {
+                    indicatorHtml = '<div class="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">' +
+                        '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>' +
+                        '</svg>' +
+                        '</div>';
+                }
+                
+                // Generate scorecard HTML
+                let scorecardHtml = '';
+                scorecard.forEach(criterion => {
+                    const category = criterion.category || '';
+                    const score = criterion.score || 0;
+                    const maxScore = criterion.max_score || 0;
+                    const passScore = criterion.pass_score || 0;
+                    const criterionFeedback = criterion.feedback || {};
+                    
+                    // Determine if this criterion passed
+                    const criterionPassed = score >= passScore;
+                    const criterionIcon = criterionPassed ? 
+                        '<div class="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">' +
+                        '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>' +
+                        '</svg>' +
+                        '</div>' :
+                        '<div class="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">' +
+                        '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>' +
+                        '</svg>' +
+                        '</div>';
+                    
+                    scorecardHtml += '<div class="mb-6 p-4 border border-gray-200 rounded-lg bg-white">' +
+                        '<div class="flex items-center justify-between mb-3">' +
+                        '<div class="flex items-center gap-3">' +
+                        criterionIcon +
+                        '<h3 class="text-lg font-medium text-gray-900">' + category + '</h3>' +
+                        '</div>' +
+                        '<div class="text-sm text-gray-600">' +
+                        score + '/' + maxScore + ' (Pass: ' + passScore + ')' +
+                        '</div>' +
+                        '</div>' +
+                        '<div class="text-sm text-gray-700">' +
+                        '<span class="text-green-600 font-medium">✓ Correct:</span> ' + (criterionFeedback.correct || '') +
+                        '</div>';
+                    
+                    if (criterionFeedback.wrong) {
+                        scorecardHtml += '<div class="text-sm text-gray-700 mt-2">' +
+                            '<span class="text-red-600 font-medium">Wrong:</span> ' + criterionFeedback.wrong +
+                            '</div>';
+                    }
+                    
+                    scorecardHtml += '</div>';
+                });
                 
                 messagesHtml += '<div class="mb-6">' +
                     '<div class="bg-gray-50 border border-gray-200 p-4 rounded-lg w-full">' +
@@ -450,11 +547,12 @@ function selectRun(runIndex) {
                     '</div>' +
                     '</div>';
             } else {
-                // Handle simple text responses
+                // Handle simple text responses or other cases
+                const contentText = typeof content === 'string' ? content : JSON.stringify(content);
                 messagesHtml += '<div class="mb-6">' +
                     '<div class="bg-gray-50 border border-gray-200 p-4 rounded-lg w-full">' +
                     '<div class="text-sm font-medium text-gray-700 mb-2">Assistant</div>' +
-                    '<div class="text-sm text-gray-900 whitespace-pre-wrap">' + content + '</div>' +
+                    '<div class="text-sm text-gray-900 whitespace-pre-wrap">' + contentText + '</div>' +
                     '</div>' +
                     '</div>';
             }
@@ -497,7 +595,6 @@ function selectRun(runIndex) {
         '<div class="flex-1 overflow-y-auto p-6">' +
         '<div class="mb-8">' +
         '<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">' +
-        '<div class="text-sm font-medium text-yellow-800 mb-2">Task:</div>' +
         '<div class="text-sm text-yellow-700 whitespace-pre-wrap">' + context + '</div>' +
         '</div>' +
         '</div>' +
@@ -619,7 +716,6 @@ function showTab(tabId, buttonElement) {
 
 // Initialize with sorted and filtered runs
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded, initializing...');
     if (runsData.length > 0) {
         updateRunsDisplay();
     }

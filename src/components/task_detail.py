@@ -4,11 +4,12 @@ from components.icons import create_status_icon
 def create_task_detail(run_data, run_name):
     """Create a task detail component showing the task context and conversation"""
 
-    # Extract task context (this will be the task description)
-    context = run_data.get("context", "")
-
     # Extract metadata to determine question type
     metadata = run_data.get("metadata", {})
+
+    # Extract task context (this will be the task description)
+    context = metadata.get("context", "")
+
     question_type = metadata.get("question_type", "")
 
     # Extract conversation messages from the run data
@@ -128,7 +129,7 @@ def create_task_detail(run_data, run_name):
                             <div class="text-sm text-gray-700">
                                 <span class="text-green-600 font-medium">✓ Correct:</span> {criterion_feedback.get("correct", "")}
                             </div>
-                            {f'<div class="text-sm text-gray-700 mt-2"><span class="text-gray-600 font-medium">Wrong:</span> {criterion_feedback.get("wrong", "")}</div>' if criterion_feedback.get("wrong") else ""}
+                            {f'<div class="text-sm text-gray-700 mt-2"><span class="text-red-600 font-medium">Wrong:</span> {criterion_feedback.get("wrong", "")}</div>' if criterion_feedback.get("wrong") else ""}
                         </div>
                         """
 
@@ -206,7 +207,6 @@ def create_task_detail(run_data, run_name):
             <!-- Task Section -->
             <div class="mb-8">
                 <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <div class="text-sm font-medium text-yellow-800 mb-2">Task:</div>
                     <div class="text-sm text-yellow-700 whitespace-pre-wrap">{context}</div>
                 </div>
             </div>
@@ -245,7 +245,6 @@ def create_task_detail(run_data, run_name):
             // Metadata sidebar functionality handled by queue.js
             function toggleMetadataSidebar() {{
                 // This will be overridden by queue.js when a run is selected
-                console.log('Metadata sidebar not yet initialized');
             }}
         </script>
     </div>

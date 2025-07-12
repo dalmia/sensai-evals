@@ -17,7 +17,7 @@ def queues_page(request, app_data):
 
     # Get queueId from query parameters for state restoration
     queue_id_param = request.query_params.get("queueId", "")
-    task_id_param = request.query_params.get("taskId", "")
+    run_id_param = request.query_params.get("runId", "")
 
     # Use queues data from session (fallback to empty list if not available)
     queues = app_data.get("queues", [])
@@ -54,8 +54,8 @@ def queues_page(request, app_data):
             create_queue_item(
                 queue["name"],
                 len(queue["runs"]),
-                format_timestamp(queue["createdAt"]),
-                queue["created_by"],
+                format_timestamp(queue["created_at"]),
+                queue["user_name"],
                 queue["id"],
             )
             for queue in queues
@@ -65,6 +65,15 @@ def queues_page(request, app_data):
     # Convert queues and queue_runs to JSON for JavaScript
     queues_json = json.dumps(queues)
     queue_runs_json = json.dumps(queue_runs)
+
+    # Create initialization data object
+    init_data = {
+        "queues": queues,
+        "user": user,
+        "selectedQueueId": queue_id_param,
+        "selectedTaskId": run_id_param,
+    }
+    init_data_json = json.dumps(init_data)
 
     # Import the queues.js file
     queues_script = ScriptX("js/queues.js")
@@ -80,9 +89,9 @@ def queues_page(request, app_data):
         {create_header(user, "queues")}
         
         <!-- Main Content -->
-        <div class="flex">
+        <div class="flex h-screen">
             <!-- Queues Sidebar -->
-            <div class="w-80 bg-white border-r border-gray-200 h-screen overflow-y-auto">
+            <div class="w-80 bg-white border-r border-gray-200 flex flex-col">
                 <!-- Annotator Filter -->
                 <div class="p-4 border-b border-gray-200">
                     <div class="relative">
@@ -104,7 +113,7 @@ def queues_page(request, app_data):
                 </div>
                 
                 <!-- Queue Items -->
-                <div>
+                <div class="flex-1 overflow-y-auto">
                     {queues_html}
                 </div>
             </div>
@@ -128,7 +137,7 @@ def queues_page(request, app_data):
         {queues_script}
         <script>
             // Initialize queues data
-            initializeQueuesData({json.dumps({"queues": queues, "user": user, "selectedQueueId": queue_id_param, "selectedTaskId": task_id_param})});
+            initializeQueuesData({init_data_json});
         </script>
     </body>
     </html>

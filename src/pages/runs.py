@@ -58,11 +58,11 @@ def runs_page(request, app_data):
         {create_header(user, "runs")}
         
         <!-- Main Content -->
-        <div class="flex">
+        <div class="flex h-screen">
             {create_filters_sidebar(organizations, courses)}
             
             <!-- Main Content Area -->
-            <div class="flex-1 bg-gray-50">
+            <div class="flex-1 bg-gray-50 flex flex-col">
                 <!-- Header -->
                 <div class="bg-white border-b border-t border-gray-200 px-6 py-4">
                     <div class="flex justify-between items-center">
@@ -127,7 +127,7 @@ def runs_page(request, app_data):
                 </div>
                 
                 <!-- Runs List -->
-                <div class="bg-white" id="runsList">
+                <div class="bg-white flex-1 overflow-y-auto" id="runsList">
                     
                 </div>
             </div>

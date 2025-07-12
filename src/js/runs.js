@@ -295,8 +295,6 @@ function filterCourses() {
 
 // Sorting function
 function sortRuns(runs, sortBy, sortOrder) {
-    console.log("sortRuns");
-    console.log(runs);
     return runs.slice().sort(function(a, b) {
         let aValue, bValue;
         

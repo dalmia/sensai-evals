@@ -10,14 +10,16 @@ import json
 
 def individual_queue_page(request, queue_id, app_data):
     """Protected individual queue page"""
+    queue_id = int(queue_id)
+
     auth_redirect = require_auth(request)
     if auth_redirect:
         return auth_redirect
 
     user = get_current_user(request)
 
-    # Get taskId from query parameters for state restoration
-    task_id_param = request.query_params.get("taskId", "")
+    # Get runId from query parameters for state restoration
+    run_id_param = request.query_params.get("runId", "")
 
     # Use queues data from session (fallback to empty list if not available)
     queues = app_data.get("queues", [])
@@ -71,14 +73,40 @@ def individual_queue_page(request, queue_id, app_data):
         course_name = metadata.get("course", {}).get("name", "")
         milestone_name = metadata.get("milestone", {}).get("name", "")
         org_name = metadata.get("org", {}).get("name", "")
+        task_title = metadata.get("task_title", "")
+        question_title = metadata.get("question_title", "")
+        run_type = metadata.get("type", "")
 
+        run_name = ""
+
+        # Start with task title if available
+        if task_title:
+            run_name = task_title
+
+        # For quiz types, add question title after task title
+        if run_type == "quiz" and question_title:
+            if run_name:
+                run_name += f" - {question_title}"
+            else:
+                run_name = question_title
+
+        # Add course and milestone information
         if course_name and milestone_name:
-            run_name = f"{course_name} - {milestone_name}"
+            if run_name:
+                run_name += f" - {course_name} - {milestone_name}"
+            else:
+                run_name = f"{course_name} - {milestone_name}"
         elif course_name:
-            run_name = course_name
-        else:
+            if run_name:
+                run_name += f" - {course_name}"
+            else:
+                run_name = course_name
+
+        # If no meaningful name constructed, use run ID
+        if not run_name:
             run_name = f"Run {run_id}"
 
+        # Add organization name at the end
         if org_name:
             run_name = f"{run_name} ({org_name})"
 
@@ -141,7 +169,7 @@ def individual_queue_page(request, queue_id, app_data):
                 <!-- Queue Header -->
                 <div class="p-4 border-b border-gray-200">
                     <h2 class="text-lg font-semibold text-gray-900">{queue["name"]} ({len(runs)})</h2>
-                    <p class="text-sm text-gray-500">Created by {queue["created_by"]}</p>
+                    <p class="text-sm text-gray-500">Created by {queue["user_name"]}</p>
                 </div>
                 
                 <!-- Filters and Timestamp Header -->
@@ -232,7 +260,7 @@ def individual_queue_page(request, queue_id, app_data):
         {queue_script}
         <script>
             // Initialize queue data
-            initializeQueueData({json.dumps({"queue": queue, "runs": runs, "user": user, "selectedTaskId": task_id_param})});
+            initializeQueueData({json.dumps({"queue": queue, "runs": runs, "user": user, "selectedTaskId": run_id_param})});
         </script>
     </body>
     </html>

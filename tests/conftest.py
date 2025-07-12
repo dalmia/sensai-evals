@@ -2,9 +2,7 @@ import pytest
 import asyncio
 import tempfile
 import os
-import aiosqlite
 from unittest.mock import patch
-from src.db import init_db, create_tables, get_new_db_connection
 
 
 @pytest.fixture(scope="session")
@@ -15,27 +13,37 @@ def event_loop():
     loop.close()
 
 
-@pytest.fixture
-async def mock_db():
-    """Create a temporary database for testing."""
-    # Create a temporary database file
+@pytest.fixture(scope="session", autouse=True)
+def patch_db_path():
+    """Patch the sqlite_db_path for all tests in this session."""
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp_file:
         db_path = tmp_file.name
 
-    # Mock the database path
-    with patch("db.config.sqlite_db_path", db_path):
-        # Initialize the database
-        await init_db()
+    # Patch both possible import paths
+    with patch("src.db.config.sqlite_db_path", db_path), patch(
+        "db.config.sqlite_db_path", db_path
+    ):
+        yield
 
-        yield db_path
+    if os.path.exists(db_path):
+        os.unlink(db_path)
 
-        # Clean up
-        if os.path.exists(db_path):
-            os.unlink(db_path)
+
+@pytest.fixture
+async def mock_db():
+    """Initialize the temp DB for each test."""
+    # Import after patching to ensure we get the patched path
+    from src.db import init_db
+
+    await init_db()
+    yield
 
 
 @pytest.fixture
 async def db_connection(mock_db):
     """Provide a database connection for tests."""
+    # Import after patching to ensure we get the patched connection
+    from src.db import get_new_db_connection
+
     async with get_new_db_connection() as conn:
         yield conn

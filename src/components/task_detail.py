@@ -179,19 +179,19 @@ def create_task_detail(run_data, run_name):
     messages_html = generate_messages_html(messages)
 
     return f"""
-    <div class="flex-1 bg-white overflow-y-auto">
+    <div class="flex-1 bg-white overflow-y-auto relative">
         <!-- Header -->
         <div class="border-b border-gray-200 px-6 py-4">
             <div class="flex justify-between items-center">
                 <h1 class="text-lg font-semibold text-gray-900">{run_name}</h1>
                 <div class="flex space-x-2">
-                    <button class="flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium border border-gray-300">
+                    <button class="flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium border border-gray-300" onclick="toggleAnnotationSidebar()">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                         </svg>
                         <span>Annotation</span>
                     </button>
-                    <button class="flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium border border-gray-300">
+                    <button onclick="toggleMetadataSidebar()" class="flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium border border-gray-300">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
@@ -200,7 +200,7 @@ def create_task_detail(run_data, run_name):
                 </div>
             </div>
         </div>
-        
+
         <!-- Content -->
         <div class="p-6">
             <!-- Task Section -->
@@ -210,13 +210,15 @@ def create_task_detail(run_data, run_name):
                     <div class="text-sm text-yellow-700 whitespace-pre-wrap">{context}</div>
                 </div>
             </div>
-            
+
             <!-- Messages Section -->
             <div class="space-y-6">
                 {messages_html}
             </div>
         </div>
-        
+
+        <!-- Metadata sidebar will be populated by JavaScript -->
+
         <!-- Tab switching script -->
         <script>
             function showTab(tabId, buttonElement) {{
@@ -224,20 +226,26 @@ def create_task_detail(run_data, run_name):
                 const messageContainer = buttonElement.closest('.bg-gray-50');
                 const tabContents = messageContainer.querySelectorAll('.tab-content');
                 tabContents.forEach(content => content.classList.add('hidden'));
-                
+
                 // Remove active state from all tab buttons in the same message
                 const tabButtons = messageContainer.querySelectorAll('.tab-button');
                 tabButtons.forEach(button => {{
                     button.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
                     button.classList.add('text-gray-500');
                 }});
-                
+
                 // Show selected tab content
                 document.getElementById(tabId).classList.remove('hidden');
-                
+
                 // Add active state to clicked button
                 buttonElement.classList.remove('text-gray-500');
                 buttonElement.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+            }}
+
+            // Metadata sidebar functionality handled by queue.js
+            function toggleMetadataSidebar() {{
+                // This will be overridden by queue.js when a run is selected
+                console.log('Metadata sidebar not yet initialized');
             }}
         </script>
     </div>

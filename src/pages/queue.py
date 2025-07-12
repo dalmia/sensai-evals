@@ -2,6 +2,8 @@ from auth import require_auth, get_current_user
 from components.header import create_header
 from components.queue_run_row import create_simple_queue_run_row
 from components.task_detail import create_task_detail
+from components.annotation_sidebar import create_annotation_sidebar
+from components.metadata_sidebar import create_metadata_sidebar
 from fasthtml.common import ScriptX
 import json
 
@@ -130,9 +132,9 @@ def individual_queue_page(request, queue_id, app_data):
         {create_header(user, "queues")}
         
         <!-- Main Content -->
-        <div class="flex">
+        <div class="flex h-screen overflow-hidden">
             <!-- Runs Sidebar -->
-            <div class="w-96 bg-white border-r border-gray-200 h-screen overflow-y-auto">
+            <div class="w-96 bg-white border-r border-gray-200 flex-shrink-0 overflow-y-auto">
                 <!-- Queue Header -->
                 <div class="p-4 border-b border-gray-200">
                     <h2 class="text-lg font-semibold text-gray-900">{queue["name"]} ({len(runs)})</h2>
@@ -200,12 +202,12 @@ def individual_queue_page(request, queue_id, app_data):
                 
                 <!-- Queue Runs List -->
                 <div id="runsList">
-                    {queue_runs_html}
+                    
                 </div>
             </div>
             
             <!-- Main Content Area -->
-            <div class="flex-1 bg-gray-50" id="mainContent">
+            <div class="flex-1 bg-gray-50 transition-all duration-300 relative" id="mainContent">
                 <div class="flex items-center justify-center h-full">
                     <div class="text-center">
                         <div class="text-gray-400 mb-4">
@@ -218,6 +220,10 @@ def individual_queue_page(request, queue_id, app_data):
                     </div>
                 </div>
             </div>
+            
+            {create_metadata_sidebar()}
+            
+            {create_annotation_sidebar()}
         </div>
         
         {queue_script}

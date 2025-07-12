@@ -54,7 +54,6 @@ def home(request):
         <div id="loadingSpinner" class="flex items-center justify-center min-h-screen">
             <div class="text-center">
                 <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p class="text-gray-600 text-lg">Loading data...</p>
             </div>
         </div>
         

@@ -38,6 +38,12 @@ function initializeQueueData(data) {
     if (runsData.length > 0) {
         selectRun(0);
     }
+    
+    // Hide loading spinner after data is loaded
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    if (loadingSpinner) {
+        loadingSpinner.style.display = 'none';
+    }
 }
 
 // Helper function to get annotation status from run data for selected annotator

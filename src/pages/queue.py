@@ -232,7 +232,12 @@ def individual_queue_page(request, queue_id, app_data):
                     
                     <!-- Queue Runs List -->
                     <div id="runsList" class="overflow-y-auto" style="height: calc(100vh - 280px);">
-                        
+                        <!-- Loading Spinner -->
+                        <div id="loadingSpinner" class="flex items-center justify-center py-12">
+                            <div class="flex items-center space-x-2">
+                                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

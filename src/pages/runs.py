@@ -128,7 +128,12 @@ def runs_page(request, app_data):
                 
                 <!-- Runs List -->
                 <div class="bg-white flex-1 overflow-y-auto" id="runsList">
-                    
+                    <!-- Loading Spinner -->
+                    <div id="loadingSpinner" class="flex items-center justify-center py-12">
+                        <div class="flex items-center space-x-2">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

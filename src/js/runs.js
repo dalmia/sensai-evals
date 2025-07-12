@@ -22,6 +22,12 @@ function initializeRunsData(data, itemsPerPage = 50) {
     updateRunsDisplay();
     updatePagination();
     updateRunsCount(); // This will also call updateAnnotatedCount
+    
+    // Hide loading spinner after data is loaded
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    if (loadingSpinner) {
+        loadingSpinner.style.display = 'none';
+    }
 }
 
 function toggleDropdown() {

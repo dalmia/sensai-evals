@@ -1,4 +1,4 @@
-from auth import require_auth, get_current_user
+from auth import require_auth, get_current_user, VALID_USERS
 from components.header import create_header
 from components.annotation_sidebar import create_annotation_sidebar
 from components.metadata_sidebar import create_metadata_sidebar
@@ -150,6 +150,14 @@ def individual_queue_page(request, queue_id, app_data):
     # Import the JavaScript for individual queue functionality
     queue_script = ScriptX("js/queue.js")
 
+    # Get annotators from VALID_USERS
+    annotators = list(VALID_USERS.keys())
+
+    # Generate annotator filter dropdown HTML
+    annotator_filter_html = ""
+    for annotator in annotators:
+        annotator_filter_html += f'<button onclick="filterByAnnotator(\'{annotator}\')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">{annotator}</button>'
+
     return f"""
     <!DOCTYPE html>
     <html>
@@ -186,9 +194,7 @@ def individual_queue_page(request, queue_id, app_data):
                                     </button>
                                     <div id="annotatorFilterDropdown" class="absolute left-0 mt-1 w-28 bg-white border border-gray-200 rounded-lg shadow-lg z-10 hidden">
                                         <div class="py-1">
-                                            <button onclick="filterByAnnotator('Aman')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Aman</button>
-                                            <button onclick="filterByAnnotator('Piyush')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Piyush</button>
-                                            <button onclick="filterByAnnotator('Gayathri')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Gayathri</button>
+                                            {annotator_filter_html}
                                         </div>
                                     </div>
                                 </div>

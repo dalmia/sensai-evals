@@ -188,8 +188,7 @@ def create_annotation_sidebar():
             const correctBtn = document.getElementById('correctBtn');
             const wrongBtn = document.getElementById('wrongBtn');
             const notes = document.getElementById('annotationNotes')?.value || '';
-            const updateBtn = document.getElementById('updateAnnotationBtn');
-            const updateBtn2 = document.getElementById('updateAnnotationBtn2');
+            const updateBtn = document.getElementById('updateAnnotationBtn2');
             
             // Get current judgement state
             const currentJudgement = correctBtn && correctBtn.className.includes('bg-green-500') ? 'correct' :
@@ -210,18 +209,16 @@ def create_annotation_sidebar():
                 }
             }
             
-            // Update both button states
-            [updateBtn, updateBtn2].forEach(btn => {
-                if (btn) {
-                    if (shouldEnable) {
-                        btn.className = 'w-full py-3 px-4 rounded-lg font-medium text-white mb-6 transition-colors duration-200 bg-blue-600 hover:bg-blue-700';
-                        btn.disabled = false;
-                    } else {
-                        btn.className = 'w-full py-3 px-4 rounded-lg font-medium text-white mb-6 transition-colors duration-200 bg-gray-300 cursor-not-allowed';
-                        btn.disabled = true;
-                    }
+            // Update button state
+            if (updateBtn) {
+                if (shouldEnable) {
+                    updateBtn.className = 'w-full py-3 px-4 rounded-lg font-medium text-white mb-6 transition-colors duration-200 bg-blue-600 hover:bg-blue-700';
+                    updateBtn.disabled = false;
+                } else {
+                    updateBtn.className = 'w-full py-3 px-4 rounded-lg font-medium text-white mb-6 transition-colors duration-200 bg-gray-300 cursor-not-allowed';
+                    updateBtn.disabled = true;
                 }
-            });
+            }
         }
         
         // Function to select judgement (correct/wrong)
@@ -273,12 +270,11 @@ def create_annotation_sidebar():
         }
         
         // Function to update annotation (placeholder for now)
-        function updateAnnotation() {
+        async function updateAnnotation() {
             const correctBtn = document.getElementById('correctBtn');
             const wrongBtn = document.getElementById('wrongBtn');
             const notes = document.getElementById('annotationNotes').value;
-            const updateBtn = document.getElementById('updateAnnotationBtn');
-            const updateBtn2 = document.getElementById('updateAnnotationBtn2');
+            const updateBtn = document.getElementById('updateAnnotationBtn2');
             
             let judgement = null;
             if (correctBtn && correctBtn.className.includes('bg-green-500')) {
@@ -287,32 +283,93 @@ def create_annotation_sidebar():
                 judgement = 'wrong';
             }
             
-            // For now, just log the values - API call will be implemented later
-            console.log('Updating annotation:', {
-                runIndex: currentRunIndex,
-                judgement: judgement,
-                notes: notes,
-                user: selectedAnnotator
-            });
+            if (!judgement) {
+                console.error('No judgement selected');
+                return;
+            }
             
-            // Show a temporary success message on both buttons
-            const originalText = 'Update annotation';
-            [updateBtn, updateBtn2].forEach(btn => {
-                if (btn) {
-                    btn.textContent = 'Updated!';
-                    btn.className = 'w-full py-3 px-4 rounded-lg font-medium text-white mb-6 transition-colors duration-200 bg-green-600';
-                    btn.disabled = true;
-                }
-            });
+            // Get current run data
+            const currentRun = runsData[currentRunIndex];
+            if (!currentRun) {
+                console.error('No current run found');
+                return;
+            }
             
-            setTimeout(() => {
-                [updateBtn, updateBtn2].forEach(btn => {
-                    if (btn) {
-                        btn.textContent = originalText;
-                    }
+            try {
+                // Call the API to create annotation
+                const response = await fetch('/api/annotations', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        run_id: currentRun.id,
+                        judgement: judgement,
+                        notes: notes
+                    })
                 });
-                updateAnnotationState();
-            }, 2000);
+                
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.error || 'Failed to create annotation');
+                }
+                
+                // Update local data structures
+                if (!currentRun.annotations) {
+                    currentRun.annotations = {};
+                }
+                currentRun.annotations[selectedAnnotator] = {
+                    judgement: judgement,
+                    notes: notes,
+                    timestamp: new Date().toISOString()
+                };
+                
+                // Update original annotation state to reflect the new state
+                originalAnnotationState = {
+                    judgement: judgement,
+                    notes: notes
+                };
+                
+                // Update the runs display to show the new annotation status
+                updateRunsDisplay();
+                
+                // Show success message on the button
+                const originalText = 'Update annotation';
+                if (updateBtn) {
+                    updateBtn.textContent = 'Updated';
+                    updateBtn.className = 'w-full py-3 px-4 rounded-lg font-medium text-white mb-6 transition-colors duration-200 bg-green-600';
+                    updateBtn.disabled = true;
+                }
+                
+                // Reset button state after 2 seconds
+                setTimeout(() => {
+                    if (updateBtn) {
+                        updateBtn.textContent = originalText;
+                    }
+                    updateAnnotationState();
+                }, 2000);
+                
+                console.log('Annotation updated successfully:', result);
+                
+            } catch (error) {
+                console.error('Error updating annotation:', error);
+                
+                // Show error message
+                if (updateBtn) {
+                    updateBtn.textContent = 'Error';
+                    updateBtn.className = 'w-full py-3 px-4 rounded-lg font-medium text-white mb-6 transition-colors duration-200 bg-red-600';
+                    updateBtn.disabled = true;
+                }
+                
+                // Reset button state after 2 seconds
+                setTimeout(() => {
+                    if (updateBtn) {
+                        updateBtn.textContent = 'Update annotation';
+                    }
+                    updateAnnotationState();
+                }, 2000);
+            }
         }
         
         // Function to toggle annotation sidebar

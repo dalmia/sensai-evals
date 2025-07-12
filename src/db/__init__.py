@@ -95,7 +95,8 @@ async def create_tables(cursor):
             notes TEXT,
             created_at NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (run_id) REFERENCES {runs_table_name} (id),
-            FOREIGN KEY (user_id) REFERENCES {users_table_name} (id)
+            FOREIGN KEY (user_id) REFERENCES {users_table_name} (id),
+            UNIQUE(run_id, user_id)
         )
     """
     )
@@ -229,13 +230,28 @@ async def get_queue(queue_id: int):
     async with get_new_db_connection() as conn:
         cursor = await conn.cursor()
 
+        queue_details = await cursor.execute(
+            f"""
+            SELECT q.id, q.name, q.user_id, u.name as user_name, q.created_at FROM {queues_table_name} q
+            JOIN {users_table_name} u ON q.user_id = u.id
+            WHERE q.id = ?
+            """,
+            (queue_id,),
+        )
+        queue_details = await cursor.fetchone()
+
+        queue = {
+            "id": queue_details[0],
+            "name": queue_details[1],
+            "user_id": queue_details[2],
+            "user_name": queue_details[3],
+            "created_at": queue_details[4],
+        }
+
         await cursor.execute(
             f"""
-            SELECT q.id, q.name, q.user_id, u.name as user_name, q.created_at,
-                   r.id as run_id, r.run_id as span_id, r.start_time, r.end_time, r.messages, r.metadata, r.created_at as run_created_at,
-                   a.judgement, a.notes, a.created_at as annotation_timestamp, ann_user.name as annotation_username
+                SELECT r.id as run_id, r.run_id as span_id, r.start_time, r.end_time, r.messages, r.metadata, r.created_at as run_created_at, a.judgement, a.notes, a.created_at as annotation_timestamp, ann_user.name as annotation_username
             FROM {queues_table_name} q
-            JOIN {users_table_name} u ON q.user_id = u.id
             LEFT JOIN {queue_runs_table_name} qr ON q.id = qr.queue_id
             LEFT JOIN {runs_table_name} r ON qr.run_id = r.id
             LEFT JOIN {annotations_table_name} a ON r.id = a.run_id
@@ -248,39 +264,42 @@ async def get_queue(queue_id: int):
 
         rows = await cursor.fetchall()
 
-        queue = {
-            "id": rows[0][0],
-            "name": rows[0][1],
-            "user_id": rows[0][2],
-            "user_name": rows[0][3],
-            "created_at": rows[0][4],
-            "runs": [],
-        }
+        runs = []
+        current_run = None
 
         for row in rows:
-            run = {
-                "id": row[5],
-                "run_id": row[6],
-                "start_time": row[7],
-                "end_time": row[8],
-                "messages": json.loads(
-                    row[9].replace("<", "&lt;").replace(">", "&gt;")
-                ),
-                "metadata": json.loads(
-                    row[10].replace("<", "&lt;").replace(">", "&gt;")
-                ),
-                "created_at": row[11],
-                "annotations": {},
-            }
+            run_id = row[0]
 
-            if row[15] is not None:
-                run["annotations"][row[15]] = {
-                    "judgement": row[12],
-                    "notes": row[13],
-                    "timestamp": row[14],
+            if current_run is None or current_run["id"] != run_id:
+                if current_run is not None:
+                    runs.append(current_run)
+
+                current_run = {
+                    "id": row[0],
+                    "run_id": row[1],
+                    "start_time": row[2],
+                    "end_time": row[3],
+                    "messages": json.loads(
+                        row[4].replace("<", "&lt;").replace(">", "&gt;")
+                    ),
+                    "metadata": json.loads(
+                        row[5].replace("<", "&lt;").replace(">", "&gt;")
+                    ),
+                    "created_at": row[6],
+                    "annotations": {},
                 }
 
-            queue["runs"].append(run)
+            if row[7] is not None:
+                current_run["annotations"][row[10]] = {
+                    "judgement": row[7],
+                    "notes": row[8],
+                    "timestamp": row[9],
+                }
+
+        if current_run is not None:
+            runs.append(current_run)
+
+        queue["runs"] = runs
 
         return queue
 
@@ -455,7 +474,7 @@ async def create_annotation_by_span_id(
 
 
 async def create_annotation(
-    run_id: int, user_id: int, judgement: str, notes: str = None, created_at: str = None
+    run_id: int, user_id: int, judgement: str, notes: str = None
 ):
     """
     Link an annotation to a run.
@@ -474,14 +493,16 @@ async def create_annotation(
 
         await cursor.execute(
             f"""
-            INSERT INTO {annotations_table_name} (run_id, user_id, judgement, notes, created_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO {annotations_table_name} (run_id, user_id, judgement, notes)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(run_id, user_id) DO UPDATE SET
+                judgement=excluded.judgement,
+                notes=excluded.notes
             """,
-            (run_id, user_id, judgement, notes, created_at),
+            (run_id, user_id, judgement, notes),
         )
 
         await conn.commit()
-        return cursor.lastrowid
 
 
 async def fetch_all_runs():
@@ -561,82 +582,17 @@ async def get_all_queues():
 
         await cursor.execute(
             f"""
-            SELECT q.id, q.name, q.user_id, u.name as user_name, q.created_at,
-                   r.id as run_id, r.run_id as span_id, r.start_time, r.end_time, r.messages, r.metadata, r.created_at as run_created_at,
-                   a.judgement, a.notes, a.created_at as annotation_timestamp, ann_user.name as annotation_username
-            FROM {queues_table_name} q
-            JOIN {users_table_name} u ON q.user_id = u.id
-            LEFT JOIN {queue_runs_table_name} qr ON q.id = qr.queue_id
-            LEFT JOIN {runs_table_name} r ON qr.run_id = r.id
-            LEFT JOIN {annotations_table_name} a ON r.id = a.run_id
-            LEFT JOIN {users_table_name} ann_user ON a.user_id = ann_user.id
-            ORDER BY q.created_at DESC, r.created_at DESC
-            """
+            SELECT id, name, user_id, created_at FROM {queues_table_name}
+            """,
         )
-
-        rows = await cursor.fetchall()
+        queue_rows = await cursor.fetchall()
 
         queues = []
-        current_queue = None
-        current_run = None
 
-        for row in rows:
+        for row in queue_rows:
             queue_id = row[0]
-            run_id = row[6]  # run_id from runs table
-
-            # If this is a new queue, create a new queue entry
-            if current_queue is None or current_queue["id"] != queue_id:
-                if current_queue is not None:
-                    # Add the last run to the current queue
-                    if current_run is not None:
-                        current_queue["runs"].append(current_run)
-                    queues.append(current_queue)
-
-                current_queue = {
-                    "id": row[0],
-                    "name": row[1],
-                    "user_id": row[2],
-                    "user_name": row[3],
-                    "created_at": row[4],
-                    "runs": [],
-                }
-                current_run = None
-
-            # If there's a run and it's a new run, create a new run entry
-            if run_id is not None:
-                if current_run is None or current_run["id"] != run_id:
-                    # Add the previous run to the current queue
-                    if current_run is not None:
-                        current_queue["runs"].append(current_run)
-
-                    current_run = {
-                        "id": row[5],
-                        "run_id": row[6],
-                        "start_time": row[7],
-                        "end_time": row[8],
-                        "messages": json.loads(
-                            row[9].replace("<", "&lt;").replace(">", "&gt;")
-                        ),
-                        "metadata": json.loads(
-                            row[10].replace("<", "&lt;").replace(">", "&gt;")
-                        ),
-                        "created_at": row[11],
-                        "annotations": {},
-                    }
-
-                # Add annotation if it exists (annotation_username is not None)
-                if row[15] is not None:  # annotation_username is not None
-                    current_run["annotations"][row[15]] = {
-                        "judgement": row[12],
-                        "notes": row[13],
-                        "timestamp": row[14],
-                    }
-
-        # Add the last run to the last queue
-        if current_queue is not None:
-            if current_run is not None:
-                current_queue["runs"].append(current_run)
-            queues.append(current_queue)
+            queue = await get_queue(queue_id)
+            queues.append(queue)
 
         return queues
 

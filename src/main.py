@@ -283,4 +283,72 @@ async def create_queue_api(request: Request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+@app.post("/api/annotations")
+async def create_annotation_api(request: Request):
+    """API endpoint to create a new annotation"""
+    # Check authentication
+    auth_redirect = require_auth(request)
+    if auth_redirect:
+        return JSONResponse({"error": "Authentication required"}, status_code=401)
+
+    try:
+        # Parse JSON body
+        body = await request.json()
+        run_id = body.get("run_id")
+        judgement = body.get("judgement")
+        notes = body.get("notes", "")
+
+        if not run_id or not judgement:
+            return JSONResponse(
+                {"error": "Run ID and judgement are required"}, status_code=400
+            )
+
+        # Get current user
+        user = get_current_user(request)
+        user_id = VALID_USERS[user]["id"]
+
+        # Import create_annotation function
+        from db import create_annotation
+
+        # Create the annotation
+        annotation_id = await create_annotation(
+            run_id=run_id, user_id=user_id, judgement=judgement, notes=notes
+        )
+
+        # Update global app_data with new annotation
+        global app_data
+        if app_data and "runs" in app_data:
+            # Find the run and update its annotations
+            for run in app_data["runs"]:
+                if run["id"] == run_id:
+                    if "annotations" not in run:
+                        run["annotations"] = {}
+                    run["annotations"][user] = {
+                        "judgement": judgement,
+                        "notes": notes,
+                        "timestamp": None,  # Will be set by database
+                    }
+                    break
+
+        # Also update queues data if it exists
+        if app_data and "queues" in app_data:
+            for queue in app_data["queues"]:
+                if "runs" in queue:
+                    for run in queue["runs"]:
+                        if run["id"] == run_id:
+                            if "annotations" not in run:
+                                run["annotations"] = {}
+                            run["annotations"][user] = {
+                                "judgement": judgement,
+                                "notes": notes,
+                                "timestamp": None,  # Will be set by database
+                            }
+                            break
+
+        return JSONResponse({"success": True})
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 serve()

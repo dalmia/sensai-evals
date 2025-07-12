@@ -1,4 +1,4 @@
-from auth import require_auth, get_current_user
+from auth import require_auth, get_current_user, VALID_USERS
 from components.header import create_header
 from components.queue_item import create_queue_item
 from components.queue_run_row import create_queue_run_row
@@ -25,17 +25,8 @@ def queues_page(request, app_data):
     # For now, use empty queue_runs until we have that data structure from API
     queue_runs = {}
 
-    # Sample annotators data (this should ideally come from the API too)
-    annotators = [
-        "Aman",
-        "Piyush",
-        "Gayathri",
-        "Priya",
-        "Rahul",
-        "Sneha",
-        "Vikram",
-        "Ananya",
-    ]
+    # Get annotators from VALID_USERS
+    annotators = list(VALID_USERS.keys())
 
     # Helper function to format ISO timestamp to human readable format
     def format_timestamp(iso_timestamp):
@@ -78,6 +69,11 @@ def queues_page(request, app_data):
     # Import the queues.js file
     queues_script = ScriptX("js/queues.js")
 
+    # Generate annotator filter dropdown HTML
+    annotator_filter_html = ""
+    for annotator in annotators:
+        annotator_filter_html += f'<button onclick="filterByAnnotator(\'{annotator}\')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">{annotator}</button>'
+
     return f"""
     <!DOCTYPE html>
     <html>
@@ -104,9 +100,7 @@ def queues_page(request, app_data):
                         </button>
                         <div id="annotatorFilterDropdown" class="absolute left-0 mt-2 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-10 hidden">
                             <div class="py-1">
-                                <button onclick="filterByAnnotator('Aman')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Aman</button>
-                                <button onclick="filterByAnnotator('Piyush')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Piyush</button>
-                                <button onclick="filterByAnnotator('Gayathri')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Gayathri</button>
+                                {annotator_filter_html}
                             </div>
                         </div>
                     </div>

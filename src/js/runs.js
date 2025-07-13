@@ -13,6 +13,279 @@ let totalPages = 1;
 let allRunsSelected = false;
 let selectedRunIds = new Set();
 
+// Load runs data from API
+async function loadRunsData() {    
+    try {
+        const response = await fetch('/api/runs');
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        runsData = data.runs || [];
+        filteredRuns = runsData;
+        totalPages = Math.ceil(filteredRuns.length / pageSize);
+        currentPage = 1;
+        
+        // Update the UI
+        updateRunsDisplay();
+        updatePagination();
+        updateRunsCount();
+        updateFiltersSidebar();
+        
+        // Hide loading spinner
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        if (loadingSpinner) {
+            loadingSpinner.style.display = 'none';
+        }
+        
+        // Enable all disabled elements
+        enableUIElements();
+        
+    } catch (error) {
+        console.error('Error loading runs data:', error);
+        
+        // Show error message
+        const runsList = document.getElementById('runsList');
+        if (runsList) {
+            runsList.innerHTML = `
+                <div class="flex items-center justify-center py-12">
+                    <div class="text-center">
+                        <div class="text-red-500 text-xl mb-4">⚠️</div>
+                        <p class="text-red-600 text-lg">Error loading runs</p>
+                        <p class="text-gray-600">${error.message}</p>
+                        <button onclick="loadRunsData('${user}')" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+    }
+}
+
+// Update filters sidebar with data
+function updateFiltersSidebar() {
+    const filtersSidebar = document.getElementById('filtersSidebar');
+    if (!filtersSidebar) return;
+    
+    // Extract unique organizations and courses
+    const organizations = extractUniqueOrganizations(runsData);
+    const courses = extractUniqueCourses(runsData);
+    
+    // Generate filters HTML
+    const filtersHTML = generateFiltersHTML(organizations, courses);
+    filtersSidebar.innerHTML = filtersHTML;
+}
+
+// Extract unique organizations from runs data
+function extractUniqueOrganizations(runs) {
+    const orgs = {};
+    for (const run of runs) {
+        const metadata = run.metadata || {};
+        const org = metadata.org || {};
+        if (org.id && org.name) {
+            orgs[org.id] = { id: org.id, name: org.name };
+        }
+    }
+    return Object.values(orgs);
+}
+
+// Extract unique courses from runs data
+function extractUniqueCourses(runs) {
+    const courses = {};
+    for (const run of runs) {
+        const metadata = run.metadata || {};
+        const course = metadata.course || {};
+        if (course.id && course.name) {
+            courses[course.id] = { id: course.id, name: course.name };
+        }
+    }
+    return Object.values(courses);
+}
+
+// Generate filters HTML
+function generateFiltersHTML(organizations, courses) {
+    return `
+        <div class="p-4">
+            <div class="mb-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Filters</h3>
+                <button onclick="clearAllFilters()" class="text-sm text-blue-600 hover:text-blue-800 mb-4">
+                    Clear all filters
+                </button>
+            </div>
+            
+            <!-- Annotation Status Filter -->
+            <div class="mb-6">
+                <h4 class="text-sm font-medium text-gray-700 mb-3">Annotation Status</h4>
+                <div class="space-y-2">
+                    <label class="flex items-center">
+                        <input type="radio" name="annotation" value="all" checked class="mr-2" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">All</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="annotation" value="annotated" class="mr-2" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">Annotated</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="annotation" value="unannotated" class="mr-2" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">Unannotated</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="annotation" value="correct" class="mr-2" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">Correct</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="annotation" value="wrong" class="mr-2" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">Wrong</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Time Range Filter -->
+            <div class="mb-6">
+                <h4 class="text-sm font-medium text-gray-700 mb-3">Time Range</h4>
+                <div class="space-y-2">
+                    <label class="flex items-center">
+                        <input type="radio" name="timerange" value="all" checked class="mr-2" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">All time</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="timerange" value="today" class="mr-2" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">Today</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="timerange" value="yesterday" class="mr-2" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">Yesterday</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="timerange" value="last7" class="mr-2" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">Last 7 days</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="timerange" value="last30" class="mr-2" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">Last 30 days</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Type Filter -->
+            <div class="mb-6">
+                <h4 class="text-sm font-medium text-gray-700 mb-3">Type</h4>
+                <div class="space-y-2">
+                    <label class="flex items-center">
+                        <input type="checkbox" class="type-filter mr-2" value="feedback" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">Feedback</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" class="type-filter mr-2" value="text" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">Text</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" class="type-filter mr-2" value="code" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">Code</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" class="type-filter mr-2" value="audio" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">Audio</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Question Type Filter -->
+            <div class="mb-6">
+                <h4 class="text-sm font-medium text-gray-700 mb-3">Question Type</h4>
+                <div class="space-y-2">
+                    <label class="flex items-center">
+                        <input type="checkbox" class="question-type-filter mr-2" value="subjective" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">Subjective</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" class="question-type-filter mr-2" value="objective" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">Objective</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Input Type Filter -->
+            <div class="mb-6">
+                <h4 class="text-sm font-medium text-gray-700 mb-3">Input Type</h4>
+                <div class="space-y-2">
+                    <label class="flex items-center">
+                        <input type="checkbox" class="input-type-filter mr-2" value="practice" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">Practice</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" class="input-type-filter mr-2" value="exam" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">Exam</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Purpose Filter -->
+            <div class="mb-6">
+                <h4 class="text-sm font-medium text-gray-700 mb-3">Purpose</h4>
+                <div class="space-y-2">
+                    <label class="flex items-center">
+                        <input type="checkbox" class="purpose-filter mr-2" value="practice" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">Practice</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" class="purpose-filter mr-2" value="exam" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">Exam</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Organization Filter -->
+            <div class="mb-6">
+                <h4 class="text-sm font-medium text-gray-700 mb-3">Organization</h4>
+                <input type="text" id="orgSearch" placeholder="Search organizations..." class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md mb-3" onkeyup="filterOrganizations()">
+                <div id="orgList" class="space-y-2 max-h-40 overflow-y-auto">
+                    ${organizations.map(org => `
+                        <label class="flex items-center">
+                            <input type="checkbox" class="org-filter mr-2" value="${org.id}" onchange="applyFilters()">
+                            <span class="text-sm text-gray-700">${org.name}</span>
+                        </label>
+                    `).join('')}
+                </div>
+            </div>
+            
+            <!-- Course Filter -->
+            <div class="mb-6">
+                <h4 class="text-sm font-medium text-gray-700 mb-3">Course</h4>
+                <input type="text" id="courseSearch" placeholder="Search courses..." class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md mb-3" onkeyup="filterCourses()">
+                <div id="courseList" class="space-y-2 max-h-40 overflow-y-auto">
+                    ${courses.map(course => `
+                        <label class="flex items-center">
+                            <input type="checkbox" class="course-filter mr-2" value="${course.id}" onchange="applyFilters()">
+                            <span class="text-sm text-gray-700">${course.name}</span>
+                        </label>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Enable UI elements after data loads
+function enableUIElements() {
+    // Enable pagination buttons
+    const prevPageBtn = document.getElementById('prevPageBtn');
+    const nextPageBtn = document.getElementById('nextPageBtn');
+    if (prevPageBtn) prevPageBtn.disabled = false;
+    if (nextPageBtn) nextPageBtn.disabled = false;
+    
+    // Enable select all checkbox
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    if (selectAllCheckbox) selectAllCheckbox.disabled = false;
+    
+    // Enable timestamp sort button
+    const timestampSortBtn = document.querySelector('button[onclick="toggleTimestampSort()"]');
+    if (timestampSortBtn) timestampSortBtn.disabled = false;
+}
+
 // Initialize runs data
 function initializeRunsData(data, itemsPerPage = 50, user = '') {
     runsData = data;

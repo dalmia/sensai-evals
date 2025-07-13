@@ -10,14 +10,11 @@ from pages.runs import runs_page
 from pages.queues import queues_page
 from pages.queue import individual_queue_page
 from dotenv import load_dotenv
-from db import fetch_all_runs, get_all_queues, create_queue, create_user
+from db import fetch_all_runs, get_all_queues, get_queue, create_queue, create_user
 import json
 import os
 
 load_dotenv()
-
-# Global variable to store app data
-app_data = None
 
 # Create FastHTML app with session middleware and Tailwind CSS
 app, rt = fast_app(
@@ -32,103 +29,33 @@ app.add_middleware(SessionMiddleware, secret_key="your-secret-key-here")
 
 @app.get("/")
 def home(request):
-    """Home page route - shows spinner and loads data before delegating to runs page"""
+    """Home page route - redirects to /runs if user is logged in, otherwise to login"""
     from auth import require_auth, get_current_user
-    from components.header import create_header
 
     auth_redirect = require_auth(request)
     if auth_redirect:
         return auth_redirect
 
-    user = get_current_user(request)
-
-    return f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>SensAI evals | Home</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-    </head>
-    <body class="bg-gray-100 min-h-screen">
-        {create_header(user, "runs")}
-        
-        <!-- Loading Spinner -->
-        <div id="loadingSpinner" class="flex items-center justify-center min-h-screen">
-            <div class="text-center">
-                <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            </div>
-        </div>
-        
-        <script>
-            // Load data on page load
-            window.addEventListener('DOMContentLoaded', function() {{
-                fetch('/api/data')
-                    .then(response => response.json())
-                    .then(data => {{
-                        if (data.error) {{
-                            console.error('Error loading data:', data.error);
-                            document.getElementById('loadingSpinner').innerHTML = `
-                                <div class="text-center">
-                                    <div class="text-red-500 text-xl mb-4">⚠️</div>
-                                    <p class="text-red-600 text-lg">Error loading data</p>
-                                    <p class="text-gray-600">${{data.error}}</p>
-                                </div>
-                            `;
-                            return;
-                        }}
-                        
-                        // Data loaded successfully, now navigate to runs page
-                        window.location.href = '/runs';
-                    }})
-                    .catch(error => {{
-                        console.error('Error:', error);
-                        document.getElementById('loadingSpinner').innerHTML = `
-                            <div class="text-center">
-                                <div class="text-red-500 text-xl mb-4">⚠️</div>
-                                <p class="text-red-600 text-lg">Network error</p>
-                                <p class="text-gray-600">Please check your connection and try again</p>
-                            </div>
-                        `;
-                    }});
-            }});
-        </script>
-    </body>
-    </html>
-    """
+    # If user is logged in, redirect to /runs
+    return RedirectResponse(url="/runs", status_code=302)
 
 
 @app.get("/runs")
 def runs(request):
-    """Runs page route - delegates to runs page with server-side data"""
-    global app_data
-    if not app_data:
-        print("No data loaded, redirecting to home")
-        # If no data loaded, redirect to home to load data
-        return RedirectResponse(url="/", status_code=302)
-
-    return runs_page(request, app_data)
+    """Runs page route - delegates to runs page"""
+    return runs_page(request)
 
 
 @app.get("/queues")
 def queues(request):
-    """Queues page route - delegates to queues page with server-side data"""
-    global app_data
-    if not app_data:
-        print("No data loaded, redirecting to home")
-        # If no data loaded, redirect to home to load data
-        return RedirectResponse(url="/", status_code=302)
-    return queues_page(request, app_data)
+    """Queues page route - delegates to queues page"""
+    return queues_page(request, None)
 
 
 @app.get("/queues/{queue_id}")
 def queue_detail(request, queue_id: str):
-    """Individual queue page route - delegates to individual queue page with server-side data"""
-    global app_data
-    if not app_data:
-        print("No data loaded, redirecting to home")
-        # If no data loaded, redirect to home to load data
-        return RedirectResponse(url="/", status_code=302)
-    return individual_queue_page(request, queue_id, app_data)
+    """Individual queue page route - delegates to individual queue page"""
+    return individual_queue_page(request, queue_id, None)
 
 
 @app.get("/login")
@@ -136,7 +63,7 @@ def login_page(request):
     """Login page"""
     user = get_current_user(request)
     if user:
-        return RedirectResponse(url="/", status_code=302)
+        return RedirectResponse(url="/runs", status_code=302)
 
     # Generate options from VALID_USERS dictionary
     options_html = ""
@@ -182,7 +109,7 @@ async def login_post(request):
 
     if username in VALID_USERS and VALID_USERS[username]["password"] == password:
         request.session["user"] = username
-        return RedirectResponse(url="/", status_code=302)
+        return RedirectResponse(url="/runs", status_code=302)
     else:
         return Html(
             Head(Title("Login Failed - FastHTML Auth")),
@@ -212,35 +139,34 @@ def logout(request):
     return RedirectResponse(url="/login", status_code=302)
 
 
-from fastcore.xtras import timed_cache
-
-
-@timed_cache(seconds=3600)
-async def get_app_data():
-    """Fetch data from database - both runs and queues"""
+@app.get("/api/runs")
+async def get_runs_api():
+    """API endpoint to get all runs"""
     try:
-        # Fetch runs data
         runs_data = await fetch_all_runs()
-
-        # Fetch queues data
-        queues_data = await get_all_queues()
-
-        # Store data globally on the server
-        return {"runs": runs_data, "queues": queues_data}
+        return JSONResponse({"runs": runs_data})
     except Exception as e:
-        return {"error": str(e)}
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
-@app.get("/api/data")
-async def get_data():
-    """Fetch data from database - both runs and queues"""
-    global app_data
+@app.get("/api/queues")
+async def get_queues_api():
+    """API endpoint to get all queues"""
     try:
-        app_data = await get_app_data()
-        return app_data
-
+        queues_data = await get_all_queues()
+        return JSONResponse({"queues": queues_data})
     except Exception as e:
-        return {"error": str(e)}
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/queues/{queue_id}")
+async def get_queue_api(queue_id: str):
+    """API endpoint to get a specific queue"""
+    try:
+        queue_data = await get_queue(int(queue_id))
+        return JSONResponse({"queue": queue_data})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @app.post("/api/queues")
@@ -263,19 +189,10 @@ async def create_queue_api(request: Request):
 
         # Get current user
         user = get_current_user(request)
-        print(user)
         user_id = VALID_USERS[user]["id"]
 
-        print(name, description, user_id, run_ids)
         # Create the queue
         new_queue = await create_queue(name, description, user_id, run_ids)
-
-        # Update global app_data with new queue
-        global app_data
-        if app_data and "queues" in app_data:
-            app_data["queues"].insert(
-                0, new_queue
-            )  # Add to beginning since queues are ordered by created_at DESC
 
         return JSONResponse({"success": True, "queue": new_queue})
 
@@ -311,39 +228,9 @@ async def create_annotation_api(request: Request):
         from db import create_annotation
 
         # Create the annotation
-        annotation_id = await create_annotation(
+        await create_annotation(
             run_id=run_id, user_id=user_id, judgement=judgement, notes=notes
         )
-
-        # Update global app_data with new annotation
-        global app_data
-        if app_data and "runs" in app_data:
-            # Find the run and update its annotations
-            for run in app_data["runs"]:
-                if run["id"] == run_id:
-                    if "annotations" not in run:
-                        run["annotations"] = {}
-                    run["annotations"][user] = {
-                        "judgement": judgement,
-                        "notes": notes,
-                        "timestamp": None,  # Will be set by database
-                    }
-                    break
-
-        # Also update queues data if it exists
-        if app_data and "queues" in app_data:
-            for queue in app_data["queues"]:
-                if "runs" in queue:
-                    for run in queue["runs"]:
-                        if run["id"] == run_id:
-                            if "annotations" not in run:
-                                run["annotations"] = {}
-                            run["annotations"][user] = {
-                                "judgement": judgement,
-                                "notes": notes,
-                                "timestamp": None,  # Will be set by database
-                            }
-                            break
 
         return JSONResponse({"success": True})
 

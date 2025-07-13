@@ -523,6 +523,7 @@ async def fetch_all_runs():
             LEFT JOIN {annotations_table_name} a ON r.id = a.run_id
             LEFT JOIN {users_table_name} u ON a.user_id = u.id
             ORDER BY r.created_at DESC
+            LIMIT 50
             """
         )
 

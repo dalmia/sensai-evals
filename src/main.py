@@ -49,7 +49,7 @@ def runs(request):
 @app.get("/queues")
 def queues(request):
     """Queues page route - delegates to queues page"""
-    return queues_page(request, None)
+    return queues_page(request)
 
 
 @app.get("/queues/{queue_id}")

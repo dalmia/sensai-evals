@@ -7,7 +7,7 @@ import json
 from datetime import datetime
 
 
-def queues_page(request, app_data):
+def queues_page(request):
     """Protected annotation queues page"""
     auth_redirect = require_auth(request)
     if auth_redirect:
@@ -17,54 +17,9 @@ def queues_page(request, app_data):
 
     # Get queueId from query parameters for state restoration
     queue_id_param = request.query_params.get("queueId", "")
-    run_id_param = request.query_params.get("runId", "")
-
-    # Use queues data from session (fallback to empty list if not available)
-    queues = app_data.get("queues", [])
-
-    # For now, use empty queue_runs until we have that data structure from API
-    queue_runs = {}
 
     # Get annotators from VALID_USERS
     annotators = list(VALID_USERS.keys())
-
-    # Helper function to format ISO timestamp to human readable format
-    def format_timestamp(iso_timestamp):
-        try:
-            # Parse ISO timestamp
-            dt = datetime.fromisoformat(iso_timestamp.replace("Z", "+00:00"))
-            # Format to human readable format: "Jul 10, 2025 at 6:01 PM"
-            return dt.strftime("%b %d, %Y at %I:%M %p")
-        except:
-            # Return original timestamp if parsing fails
-            return iso_timestamp
-
-    # Generate all queue items
-    queues_html = "".join(
-        [
-            create_queue_item(
-                queue["name"],
-                len(queue["runs"]),
-                format_timestamp(queue["created_at"]),
-                queue["user_name"],
-                queue["id"],
-            )
-            for queue in queues
-        ]
-    )
-
-    # Convert queues and queue_runs to JSON for JavaScript
-    queues_json = json.dumps(queues)
-    queue_runs_json = json.dumps(queue_runs)
-
-    # Create initialization data object
-    init_data = {
-        "queues": queues,
-        "user": user,
-        "selectedQueueId": queue_id_param,
-        "selectedRunId": run_id_param,
-    }
-    init_data_json = json.dumps(init_data)
 
     # Import the queues.js file
     queues_script = ScriptX("js/queues.js")
@@ -106,9 +61,16 @@ def queues_page(request, app_data):
                     </div>
                 </div>
                 
-                <!-- Queue Items -->
-                <div class="flex-1 overflow-y-auto">
-                    {queues_html}
+                <!-- Queue Items - will be populated after data loads -->
+                <div class="flex-1 overflow-y-auto" id="queuesList">
+                    <!-- Loading placeholder for queues -->
+                    <div class="p-4">
+                        <div class="animate-pulse">
+                            <div class="h-16 bg-gray-200 rounded mb-4"></div>
+                            <div class="h-16 bg-gray-200 rounded mb-4"></div>
+                            <div class="h-16 bg-gray-200 rounded mb-4"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -121,8 +83,7 @@ def queues_page(request, app_data):
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                             </svg>
                         </div>
-                        <h3 class="text-lg font-medium text-gray-900 mb-2">No queue selected</h3>
-                        <p class="text-sm text-gray-500">Select an annotation queue from the list to view and annotate its runs</p>
+                        <h3 class="text-lg font-medium text-gray-900 mb-2">Loading queues...</h3>
                     </div>
                 </div>
             </div>
@@ -130,8 +91,10 @@ def queues_page(request, app_data):
         
         {queues_script}
         <script>
-            // Initialize queues data
-            initializeQueuesData({init_data_json});
+            // Load data from API when page loads
+            window.addEventListener('DOMContentLoaded', function() {{
+                loadQueuesData('{queue_id_param}');
+            }});
         </script>
     </body>
     </html>

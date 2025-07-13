@@ -7,6 +7,132 @@ let pageSize = 20;
 let totalPages = 1;
 let currentQueueRuns = [];
 
+// Load queues data from API
+async function loadQueuesData(selectedQueueId = '') {    
+    try {
+        const response = await fetch('/api/queues');
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        queuesData = data.queues || [];
+        
+        // Update the UI
+        updateQueuesList();
+        
+        // Restore queue selection if provided
+        if (selectedQueueId && queuesData.length > 0) {
+            const queue = queuesData.find(q => q.id === Number(selectedQueueId));
+            if (queue) {
+                setTimeout(() => {
+                    showQueueDetails(selectedQueueId);
+                })
+            }
+        }
+        
+        // Update main content to show "No queue selected" message
+        updateMainContent();
+        
+    } catch (error) {
+        console.error('Error loading queues data:', error);
+        
+        // Show error message
+        const queuesList = document.getElementById('queuesList');
+        if (queuesList) {
+            queuesList.innerHTML = `
+                <div class="p-4">
+                    <div class="text-center">
+                        <div class="text-red-500 text-xl mb-4">⚠️</div>
+                        <p class="text-red-600 text-lg">Error loading queues</p>
+                        <p class="text-gray-600">${error.message}</p>
+                        <button onclick="loadQueuesData('${user}', '${selectedQueueId}', '${selectedRunId}')" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+    }
+}
+
+// Update queues list with data
+function updateQueuesList() {
+    const queuesList = document.getElementById('queuesList');
+    if (!queuesList) return;
+    
+    if (queuesData.length === 0) {
+        queuesList.innerHTML = `
+            <div class="p-4">
+                <div class="text-center">
+                    <div class="text-gray-400 mb-4">
+                        <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">No queues found</h3>
+                    <p class="text-sm text-gray-500">No annotation queues have been created yet</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
+    // Generate queues HTML
+    const queuesHTML = queuesData.map(queue => {
+        const formattedTimestamp = formatTimestamp(queue.created_at);
+        return createQueueItem(
+            queue.name,
+            queue.runs ? queue.runs.length : 0,
+            formattedTimestamp,
+            queue.user_name,
+            queue.id
+        );
+    }).join('');
+    
+    queuesList.innerHTML = queuesHTML;
+}
+
+// Update main content to show "No queue selected" message
+function updateMainContent() {
+    const mainContent = document.getElementById('mainContent');
+    if (mainContent) {
+        mainContent.innerHTML = `
+            <div class="flex items-center justify-center h-full">
+                <div class="text-center">
+                    <div class="text-gray-400 mb-4">
+                        <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">No queue selected</h3>
+                    <p class="text-sm text-gray-500">Select an annotation queue from the list to view and annotate its runs</p>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// Helper function to create queue item HTML
+function createQueueItem(name, runCount, formattedTimestamp, userName, queueId) {
+    return `
+        <div onclick="showQueueDetails('${queueId}')" class="border-l-4 border-l-transparent border-b border-gray-100 px-4 py-4 hover:bg-gray-50 cursor-pointer transition-colors">
+            <div class="flex justify-between items-start">
+                <div class="flex-1">
+                    <h3 class="text-sm font-medium text-gray-900">${name}</h3>
+                    <p class="text-xs text-gray-500 mt-1">${runCount} runs</p>
+                    <p class="text-xs text-gray-500">Created by ${userName}</p>
+                    <p class="text-xs text-gray-500">${formattedTimestamp}</p>
+                </div>
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+            </div>
+        </div>
+    `;
+}
+
 // Helper function to format ISO timestamp to human readable format
 function formatTimestamp(isoTimestamp) {
     try {
@@ -141,8 +267,8 @@ function showQueueDetails(queueId) {
         selectedItem.classList.add('bg-blue-50', 'border-l-blue-500');
         selectedItem.classList.remove('border-l-transparent');
     }
-    
-    const queue = queuesData.find(q => q.id === queueId);
+
+    const queue = queuesData.find(q => q.id === Number(queueId));
 
     if (!queue) return;
     

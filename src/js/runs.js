@@ -175,20 +175,12 @@ function generateFiltersHTML(organizations, courses) {
                 <h4 class="text-sm font-medium text-gray-700 mb-3">Type</h4>
                 <div class="space-y-2">
                     <label class="flex items-center">
-                        <input type="checkbox" class="type-filter mr-2" value="feedback" onchange="applyFilters()">
-                        <span class="text-sm text-gray-700">Feedback</span>
+                        <input type="checkbox" class="type-filter mr-2" value="quiz" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">Quiz</span>
                     </label>
                     <label class="flex items-center">
-                        <input type="checkbox" class="type-filter mr-2" value="text" onchange="applyFilters()">
-                        <span class="text-sm text-gray-700">Text</span>
-                    </label>
-                    <label class="flex items-center">
-                        <input type="checkbox" class="type-filter mr-2" value="code" onchange="applyFilters()">
-                        <span class="text-sm text-gray-700">Code</span>
-                    </label>
-                    <label class="flex items-center">
-                        <input type="checkbox" class="type-filter mr-2" value="audio" onchange="applyFilters()">
-                        <span class="text-sm text-gray-700">Audio</span>
+                        <input type="checkbox" class="type-filter mr-2" value="learning_material" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">Learning Material</span>
                     </label>
                 </div>
             </div>
@@ -213,12 +205,12 @@ function generateFiltersHTML(organizations, courses) {
                 <h4 class="text-sm font-medium text-gray-700 mb-3">Input Type</h4>
                 <div class="space-y-2">
                     <label class="flex items-center">
-                        <input type="checkbox" class="input-type-filter mr-2" value="practice" onchange="applyFilters()">
-                        <span class="text-sm text-gray-700">Practice</span>
+                        <input type="checkbox" class="input-type-filter mr-2" value="text" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">text</span>
                     </label>
                     <label class="flex items-center">
-                        <input type="checkbox" class="input-type-filter mr-2" value="exam" onchange="applyFilters()">
-                        <span class="text-sm text-gray-700">Exam</span>
+                        <input type="checkbox" class="input-type-filter mr-2" value="code" onchange="applyFilters()">
+                        <span class="text-sm text-gray-700">code</span>
                     </label>
                 </div>
             </div>

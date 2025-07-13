@@ -505,9 +505,36 @@ async def create_annotation(
         await conn.commit()
 
 
-async def fetch_all_runs():
+async def fetch_all_runs(
+    annotation_filter: str = None,
+    time_range: str = None,
+    org_name: str = None,
+    course_name: str = None,
+    run_type: str = None,
+    purpose: str = None,
+    question_type: str = None,
+    question_input_type: str = None,
+):
     """
-    Fetch all runs from the database with their annotations.
+    Fetch runs from the database with their annotations, filtered by query parameters.
+
+    Args:
+        annotation_filter: Filter by annotation status
+            - "has_annotations": Only runs with any annotations
+            - "no_annotations": Only runs without annotations
+            - "correct": Only runs with judgement = "correct" in annotations
+            - "wrong": Only runs with judgement = "wrong" in annotations
+        time_range: Filter by time range
+            - "today": Runs created today
+            - "yesterday": Runs created yesterday
+            - "last_7_days": Runs created in last 7 days
+            - "last_30_days": Runs created in last 30 days
+        org_name: Filter by organization name in metadata
+        course_name: Filter by course name in metadata
+        run_type: Filter by run type in metadata ("quiz" or "learning_material")
+        purpose: Filter by purpose in metadata ("exam" or "practice")
+        question_type: Filter by question type in metadata ("objective" or "subjective")
+        question_input_type: Filter by question input type in metadata ("code" or "text")
 
     Returns:
         List of dictionaries containing run data with annotations
@@ -515,18 +542,76 @@ async def fetch_all_runs():
     async with get_new_db_connection() as conn:
         cursor = await conn.cursor()
 
-        await cursor.execute(
-            f"""
+        # Build the base query
+        query = f"""
             SELECT r.id, r.run_id, r.start_time, r.end_time, r.messages, r.metadata, r.created_at,
                    a.judgement, a.notes, a.created_at as timestamp, u.name as username
             FROM {runs_table_name} r
             LEFT JOIN {annotations_table_name} a ON r.id = a.run_id
             LEFT JOIN {users_table_name} u ON a.user_id = u.id
-            ORDER BY r.created_at DESC
-            LIMIT 50
-            """
-        )
+        """
 
+        # Build WHERE clause based on filters
+        where_conditions = []
+        params = []
+
+        # Time range filter
+        if time_range:
+            if time_range == "today":
+                where_conditions.append("DATE(r.created_at) = DATE('now')")
+            elif time_range == "yesterday":
+                where_conditions.append("DATE(r.created_at) = DATE('now', '-1 day')")
+            elif time_range == "last_7_days":
+                where_conditions.append("r.created_at >= DATE('now', '-7 days')")
+            elif time_range == "last_30_days":
+                where_conditions.append("r.created_at >= DATE('now', '-30 days')")
+
+        # Annotation filter
+        if annotation_filter:
+            if annotation_filter == "has_annotations":
+                where_conditions.append("a.id IS NOT NULL")
+            elif annotation_filter == "no_annotations":
+                where_conditions.append("a.id IS NULL")
+            elif annotation_filter == "correct":
+                where_conditions.append("a.judgement = 'correct'")
+            elif annotation_filter == "wrong":
+                where_conditions.append("a.judgement = 'wrong'")
+
+        # Metadata filters
+        if org_name:
+            where_conditions.append("JSON_EXTRACT(r.metadata, '$.org.name') = ?")
+            params.append(org_name)
+
+        if course_name:
+            where_conditions.append("JSON_EXTRACT(r.metadata, '$.course.name') = ?")
+            params.append(course_name)
+
+        if run_type:
+            where_conditions.append("JSON_EXTRACT(r.metadata, '$.type') = ?")
+            params.append(run_type)
+
+        if purpose:
+            where_conditions.append("JSON_EXTRACT(r.metadata, '$.purpose') = ?")
+            params.append(purpose)
+
+        if question_type:
+            where_conditions.append("JSON_EXTRACT(r.metadata, '$.question_type') = ?")
+            params.append(question_type)
+
+        if question_input_type:
+            where_conditions.append(
+                "JSON_EXTRACT(r.metadata, '$.question_input_type') = ?"
+            )
+            params.append(question_input_type)
+
+        # Add WHERE clause if there are conditions
+        if where_conditions:
+            query += " WHERE " + " AND ".join(where_conditions)
+
+        query += " ORDER BY r.created_at DESC LIMIT 50"
+
+        # Execute query with parameters
+        await cursor.execute(query, params)
         rows = await cursor.fetchall()
 
         # Convert rows to list of dictionaries with annotations

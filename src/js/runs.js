@@ -109,10 +109,10 @@ function extractUniqueCourses(runs) {
 function generateFiltersHTML(organizations, courses) {
     return `
         <div class="p-4">
-            <div class="mb-6">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">Filters</h3>
-                <button onclick="clearAllFilters()" class="text-sm text-blue-600 hover:text-blue-800 mb-4">
-                    Clear all filters
+            <div class="mb-6 flex items-center justify-between">
+                <h3 class="text-lg font-medium text-gray-900">Filters</h3>
+                <button onclick="clearAllFilters()" class="text-sm text-blue-600 hover:text-blue-800">
+                    Clear
                 </button>
             </div>
             

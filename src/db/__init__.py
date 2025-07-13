@@ -12,7 +12,41 @@ from .config import (
 )
 from contextlib import asynccontextmanager
 import aiosqlite
+import traceback
 from typing import Optional, List
+import asyncio
+import functools
+
+
+def log_exceptions(func):
+    """
+    Decorator that logs all exceptions to the terminal.
+    Works with both sync and async functions.
+    """
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            print(f"ERROR in {func.__name__}: {e}")
+            traceback.print_exc()
+            raise
+
+    @functools.wraps(func)
+    async def async_wrapper(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except Exception as e:
+            print(f"ERROR in {func.__name__}: {e}")
+            traceback.print_exc()
+            raise
+
+    # Return the appropriate wrapper based on whether the function is async
+    if asyncio.iscoroutinefunction(func):
+        return async_wrapper
+    else:
+        return wrapper
 
 
 @asynccontextmanager
@@ -657,6 +691,7 @@ async def fetch_all_runs(
         return runs
 
 
+@log_exceptions
 async def get_all_queues():
     """
     Get all queues with their associated user information and runs with annotations.
@@ -669,7 +704,7 @@ async def get_all_queues():
 
         await cursor.execute(
             f"""
-            SELECT id, name, user_id, created_at FROM {queues_table_name}
+            SELECT id FROM {queues_table_name}
             """,
         )
         queue_rows = await cursor.fetchall()

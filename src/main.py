@@ -10,7 +10,13 @@ from pages.runs import runs_page
 from pages.queues import queues_page
 from pages.queue import individual_queue_page
 from dotenv import load_dotenv
-from db import fetch_all_runs, get_all_queues, get_queue, create_queue, create_user
+from db import (
+    fetch_all_runs,
+    get_all_queues,
+    get_queue,
+    create_queue,
+    get_unique_orgs_and_courses,
+)
 import json
 import os
 
@@ -140,11 +146,65 @@ def logout(request):
 
 
 @app.get("/api/runs")
-async def get_runs_api():
-    """API endpoint to get all runs"""
+async def get_runs_api(request: Request):
+    """API endpoint to get filtered and paginated runs"""
     try:
-        runs_data = await fetch_all_runs()
-        return JSONResponse({"runs": runs_data})
+        # Get query params
+        params = request.query_params
+        annotation_filter = params.get("annotation_filter")
+        time_range = params.get("time_range")
+        org_id = params.get("org_id")
+        course_id = params.get("course_id")
+        run_type = params.get("run_type")
+        purpose = params.get("purpose")
+        question_type = params.get("question_type")
+        question_input_type = params.get("question_input_type")
+        page = int(params.get("page", 1))
+        page_size = int(params.get("page_size", 20))
+
+        # Get current user ID for annotation filtering
+        annotation_filter_user_id = None
+        if annotation_filter:
+            user = get_current_user(request)
+            if user and user in VALID_USERS:
+                annotation_filter_user_id = VALID_USERS[user]["id"]
+
+        # Support multiple values for comma-separated filters
+        def parse_multi(val):
+            if val is None:
+                return None
+            return [v.strip() for v in val.split(",") if v.strip()]
+
+        run_type = parse_multi(run_type)
+        purpose = parse_multi(purpose)
+        question_type = parse_multi(question_type)
+        question_input_type = parse_multi(question_input_type)
+        org_id = parse_multi(org_id)
+        course_id = parse_multi(course_id)
+
+        # Call fetch_all_runs with all filters and pagination
+        runs_data, total_count = await fetch_all_runs(
+            annotation_filter=annotation_filter,
+            time_range=time_range,
+            org_id=org_id,
+            course_id=course_id,
+            run_type=run_type,
+            purpose=purpose,
+            question_type=question_type,
+            question_input_type=question_input_type,
+            page=page,
+            page_size=page_size,
+            annotation_filter_user_id=annotation_filter_user_id,
+        )
+        total_pages = (total_count + page_size - 1) // page_size
+        return JSONResponse(
+            {
+                "runs": runs_data,
+                "total_count": total_count,
+                "total_pages": total_pages,
+                "current_page": page,
+            }
+        )
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
@@ -165,6 +225,16 @@ async def get_queue_api(queue_id: str):
     try:
         queue_data = await get_queue(int(queue_id))
         return JSONResponse({"queue": queue_data})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/filter_data")
+async def get_filter_data():
+    """API endpoint to get the data required for the filters section"""
+    try:
+        data = await get_unique_orgs_and_courses()
+        return JSONResponse(data)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 

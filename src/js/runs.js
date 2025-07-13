@@ -4,10 +4,14 @@ let currentSort = {'by': 'timestamp', 'order': 'desc'};
 let filteredRuns = [];
 let currentUser = ''; // Current logged-in user
 
+// Filter data - will be fetched from API
+let filterData = { orgs: [], courses: [] };
+
 // Pagination variables
 let currentPage = 1;
-let pageSize = 50;
+let pageSize = 20;
 let totalPages = 1;
+let totalCount = 0; // Total count from backend
 
 // Selection variables
 let allRunsSelected = false;
@@ -16,23 +20,40 @@ let selectedRunIds = new Set();
 // Load runs data from API
 async function loadRunsData() {    
     try {
-        const response = await fetch('/api/runs');
-        const data = await response.json();
+        // Check if filter data needs to be fetched (only on first load)
+        const needsFilterData = !filterData.orgs || filterData.orgs.length === 0;
         
-        if (data.error) {
-            throw new Error(data.error);
+        if (needsFilterData) {
+            // Fetch filter data and runs data in parallel (first time only)
+            const urlParams = new URLSearchParams(window.location.search);
+            const page = parseInt(urlParams.get('page')) || 1;
+            
+            const [filterResponse, runsResponse] = await Promise.all([
+                fetch('/api/filter_data'),
+                applyFilters(page, false) // Pass false for initial load
+            ]);
+            
+            // Handle filter data response and update sidebar immediately
+            if (filterResponse.ok) {
+                filterData = await filterResponse.json();
+                if (filterData.error) {
+                    console.error('Error fetching filter data:', filterData.error);
+                    // Use empty arrays as fallback
+                    filterData = { orgs: [], courses: [] };
+                } else {
+                    // Update sidebar as soon as filter data is available
+                    updateFiltersSidebar();
+                }
+            } else {
+                console.error('Failed to fetch filter data');
+                filterData = { orgs: [], courses: [] };
+            }
+        } else {
+            // Filter data already available, just fetch runs
+            const urlParams = new URLSearchParams(window.location.search);
+            const page = parseInt(urlParams.get('page')) || 1;
+            await applyFilters(page, false); // Pass false for initial load
         }
-        
-        runsData = data.runs || [];
-        filteredRuns = runsData;
-        totalPages = Math.ceil(filteredRuns.length / pageSize);
-        currentPage = 1;
-        
-        // Update the UI
-        updateRunsDisplay();
-        updatePagination();
-        updateRunsCount();
-        updateFiltersSidebar();
         
         // Hide loading spinner
         const loadingSpinner = document.getElementById('loadingSpinner');
@@ -55,7 +76,7 @@ async function loadRunsData() {
                         <div class="text-red-500 text-xl mb-4">⚠️</div>
                         <p class="text-red-600 text-lg">Error loading runs</p>
                         <p class="text-gray-600">${error.message}</p>
-                        <button onclick="loadRunsData('${user}')" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                        <button onclick="loadRunsData()" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
                             Retry
                         </button>
                     </div>
@@ -70,39 +91,17 @@ function updateFiltersSidebar() {
     const filtersSidebar = document.getElementById('filtersSidebar');
     if (!filtersSidebar) return;
     
-    // Extract unique organizations and courses
-    const organizations = extractUniqueOrganizations(runsData);
-    const courses = extractUniqueCourses(runsData);
+    // Use the fetched filter data instead of extracting from runs
+    const organizations = filterData.orgs || [];
+    const courses = filterData.courses || [];
     
     // Generate filters HTML
     const filtersHTML = generateFiltersHTML(organizations, courses);
     filtersSidebar.innerHTML = filtersHTML;
-}
-
-// Extract unique organizations from runs data
-function extractUniqueOrganizations(runs) {
-    const orgs = {};
-    for (const run of runs) {
-        const metadata = run.metadata || {};
-        const org = metadata.org || {};
-        if (org.id && org.name) {
-            orgs[org.id] = { id: org.id, name: org.name };
-        }
-    }
-    return Object.values(orgs);
-}
-
-// Extract unique courses from runs data
-function extractUniqueCourses(runs) {
-    const courses = {};
-    for (const run of runs) {
-        const metadata = run.metadata || {};
-        const course = metadata.course || {};
-        if (course.id && course.name) {
-            courses[course.id] = { id: course.id, name: course.name };
-        }
-    }
-    return Object.values(courses);
+    
+    // Restore filter state from URL after generating the HTML
+    // Note: This will be called again to ensure filters are properly set after HTML regeneration
+    restoreFiltersFromURL();
 }
 
 // Generate filters HTML
@@ -115,121 +114,113 @@ function generateFiltersHTML(organizations, courses) {
                     Clear
                 </button>
             </div>
-            
+            <div class="mb-4">
+                <button id="applyFiltersBtn" class="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700" onclick="applyFilters()">Apply Filter</button>
+            </div>
             <!-- Annotation Status Filter -->
             <div class="mb-6">
                 <h4 class="text-sm font-medium text-gray-700 mb-3">Annotation Status</h4>
                 <div class="space-y-2">
                     <label class="flex items-center">
-                        <input type="radio" name="annotation" value="all" checked class="mr-2" onchange="applyFilters()">
+                        <input type="radio" name="annotation" value="all" checked class="mr-2">
                         <span class="text-sm text-gray-700">All</span>
                     </label>
                     <label class="flex items-center">
-                        <input type="radio" name="annotation" value="annotated" class="mr-2" onchange="applyFilters()">
+                        <input type="radio" name="annotation" value="annotated" class="mr-2">
                         <span class="text-sm text-gray-700">Annotated</span>
                     </label>
                     <label class="flex items-center">
-                        <input type="radio" name="annotation" value="unannotated" class="mr-2" onchange="applyFilters()">
+                        <input type="radio" name="annotation" value="unannotated" class="mr-2">
                         <span class="text-sm text-gray-700">Unannotated</span>
                     </label>
                     <label class="flex items-center">
-                        <input type="radio" name="annotation" value="correct" class="mr-2" onchange="applyFilters()">
+                        <input type="radio" name="annotation" value="correct" class="mr-2">
                         <span class="text-sm text-gray-700">Correct</span>
                     </label>
                     <label class="flex items-center">
-                        <input type="radio" name="annotation" value="wrong" class="mr-2" onchange="applyFilters()">
+                        <input type="radio" name="annotation" value="wrong" class="mr-2">
                         <span class="text-sm text-gray-700">Wrong</span>
                     </label>
                 </div>
             </div>
-            
             <!-- Time Range Filter -->
             <div class="mb-6">
                 <h4 class="text-sm font-medium text-gray-700 mb-3">Time Range</h4>
                 <div class="space-y-2">
                     <label class="flex items-center">
-                        <input type="radio" name="timerange" value="all" checked class="mr-2" onchange="applyFilters()">
+                        <input type="radio" name="timerange" value="all" checked class="mr-2">
                         <span class="text-sm text-gray-700">All time</span>
                     </label>
                     <label class="flex items-center">
-                        <input type="radio" name="timerange" value="today" class="mr-2" onchange="applyFilters()">
-                        <span class="text-sm text-gray-700">Today</span>
-                    </label>
-                    <label class="flex items-center">
-                        <input type="radio" name="timerange" value="yesterday" class="mr-2" onchange="applyFilters()">
+                        <input type="radio" name="timerange" value="yesterday" class="mr-2">
                         <span class="text-sm text-gray-700">Yesterday</span>
                     </label>
                     <label class="flex items-center">
-                        <input type="radio" name="timerange" value="last7" class="mr-2" onchange="applyFilters()">
+                        <input type="radio" name="timerange" value="last7" class="mr-2">
                         <span class="text-sm text-gray-700">Last 7 days</span>
                     </label>
                     <label class="flex items-center">
-                        <input type="radio" name="timerange" value="last30" class="mr-2" onchange="applyFilters()">
+                        <input type="radio" name="timerange" value="last30" class="mr-2">
                         <span class="text-sm text-gray-700">Last 30 days</span>
                     </label>
                 </div>
             </div>
-            
             <!-- Type Filter -->
             <div class="mb-6">
                 <h4 class="text-sm font-medium text-gray-700 mb-3">Type</h4>
                 <div class="space-y-2">
                     <label class="flex items-center">
-                        <input type="checkbox" class="type-filter mr-2" value="quiz" onchange="applyFilters()">
+                        <input type="checkbox" class="type-filter mr-2" value="quiz">
                         <span class="text-sm text-gray-700">Quiz</span>
                     </label>
                     <label class="flex items-center">
-                        <input type="checkbox" class="type-filter mr-2" value="learning_material" onchange="applyFilters()">
+                        <input type="checkbox" class="type-filter mr-2" value="learning_material">
                         <span class="text-sm text-gray-700">Learning Material</span>
                     </label>
                 </div>
             </div>
-            
             <!-- Question Type Filter -->
             <div class="mb-6">
                 <h4 class="text-sm font-medium text-gray-700 mb-3">Question Type</h4>
                 <div class="space-y-2">
                     <label class="flex items-center">
-                        <input type="checkbox" class="question-type-filter mr-2" value="subjective" onchange="applyFilters()">
+                        <input type="checkbox" class="question-type-filter mr-2" value="subjective">
                         <span class="text-sm text-gray-700">Subjective</span>
                     </label>
                     <label class="flex items-center">
-                        <input type="checkbox" class="question-type-filter mr-2" value="objective" onchange="applyFilters()">
+                        <input type="checkbox" class="question-type-filter mr-2" value="objective">
                         <span class="text-sm text-gray-700">Objective</span>
                     </label>
                 </div>
             </div>
-            
             <!-- Input Type Filter -->
             <div class="mb-6">
                 <h4 class="text-sm font-medium text-gray-700 mb-3">Input Type</h4>
                 <div class="space-y-2">
                     <label class="flex items-center">
-                        <input type="checkbox" class="input-type-filter mr-2" value="text" onchange="applyFilters()">
+                        <input type="checkbox" class="input-type-filter mr-2" value="text">
                         <span class="text-sm text-gray-700">text</span>
                     </label>
                     <label class="flex items-center">
-                        <input type="checkbox" class="input-type-filter mr-2" value="code" onchange="applyFilters()">
+                        <input type="checkbox" class="input-type-filter mr-2" value="code">
                         <span class="text-sm text-gray-700">code</span>
                     </label>
                 </div>
             </div>
-            
             <!-- Purpose Filter -->
             <div class="mb-6">
                 <h4 class="text-sm font-medium text-gray-700 mb-3">Purpose</h4>
                 <div class="space-y-2">
                     <label class="flex items-center">
-                        <input type="checkbox" class="purpose-filter mr-2" value="practice" onchange="applyFilters()">
+                        <input type="checkbox" class="purpose-filter mr-2" value="practice">
                         <span class="text-sm text-gray-700">Practice</span>
                     </label>
                     <label class="flex items-center">
-                        <input type="checkbox" class="purpose-filter mr-2" value="exam" onchange="applyFilters()">
+                        <input type="checkbox" class="purpose-filter mr-2" value="exam">
                         <span class="text-sm text-gray-700">Exam</span>
                     </label>
                 </div>
             </div>
-            
             <!-- Organization Filter -->
             <div class="mb-6">
                 <h4 class="text-sm font-medium text-gray-700 mb-3">Organization</h4>
@@ -237,13 +228,12 @@ function generateFiltersHTML(organizations, courses) {
                 <div id="orgList" class="space-y-2 max-h-40 overflow-y-auto">
                     ${organizations.map(org => `
                         <label class="flex items-center">
-                            <input type="checkbox" class="org-filter mr-2" value="${org.id}" onchange="applyFilters()">
+                            <input type="checkbox" class="org-filter mr-2" value="${org.id}">
                             <span class="text-sm text-gray-700">${org.name}</span>
                         </label>
                     `).join('')}
                 </div>
             </div>
-            
             <!-- Course Filter -->
             <div class="mb-6">
                 <h4 class="text-sm font-medium text-gray-700 mb-3">Course</h4>
@@ -251,7 +241,7 @@ function generateFiltersHTML(organizations, courses) {
                 <div id="courseList" class="space-y-2 max-h-40 overflow-y-auto">
                     ${courses.map(course => `
                         <label class="flex items-center">
-                            <input type="checkbox" class="course-filter mr-2" value="${course.id}" onchange="applyFilters()">
+                            <input type="checkbox" class="course-filter mr-2" value="${course.id}">
                             <span class="text-sm text-gray-700">${course.name}</span>
                         </label>
                     `).join('')}
@@ -302,72 +292,158 @@ function toggleDropdown() {
     dropdown.classList.toggle('hidden');
 }
 
-// Apply all filters
-function applyFilters() {
-    filteredRuns = runsData.filter(run => {
-        // Get annotation filter
-        const annotationFilter = document.querySelector('input[name="annotation"]:checked').value;
-        if (!passesAnnotationFilter(run, annotationFilter)) {
-            return false;
+// Restore filter state from URL
+function restoreFiltersFromURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // Restore annotation filter
+    const annotationFilter = urlParams.get('annotation_filter') || 'all';
+    const annotationRadio = document.querySelector(`input[name="annotation"][value="${annotationFilter}"]`);
+    if (annotationRadio) annotationRadio.checked = true;
+    
+    // Restore time range filter
+    const timeRange = urlParams.get('time_range') || 'all';
+    const timeRangeRadio = document.querySelector(`input[name="timerange"][value="${timeRange}"]`);
+    if (timeRangeRadio) timeRangeRadio.checked = true;
+    
+    // Restore checkbox filters
+    const restoreCheckboxes = (paramName, className) => {
+        const values = urlParams.get(paramName);
+        if (values) {
+            const valueArray = values.split(',');
+            valueArray.forEach(value => {
+                const checkbox = document.querySelector(`.${className}[value="${value}"]`);
+                if (checkbox) checkbox.checked = true;
+            });
         }
+    };
+    
+    restoreCheckboxes('run_type', 'type-filter');
+    restoreCheckboxes('question_type', 'question-type-filter');
+    restoreCheckboxes('question_input_type', 'input-type-filter');
+    restoreCheckboxes('purpose', 'purpose-filter');
+    restoreCheckboxes('org_id', 'org-filter');
+    restoreCheckboxes('course_id', 'course-filter');
+}
 
-        // Get time range filter
-        const timeRangeFilter = document.querySelector('input[name="timerange"]:checked').value;
-        if (!passesTimeRangeFilter(run, timeRangeFilter)) {
-            return false;
+// Save filter state to URL
+function saveFiltersToURL(page = 1) {
+    const params = new URLSearchParams();
+    
+    // Add page
+    if (page > 1) params.set('page', page);
+    
+    // Add filters
+    const annotationFilter = document.querySelector('input[name="annotation"]:checked')?.value;
+    if (annotationFilter && annotationFilter !== 'all') {
+        params.set('annotation_filter', annotationFilter);
+    }
+    
+    const timeRangeFilter = document.querySelector('input[name="timerange"]:checked')?.value;
+    if (timeRangeFilter && timeRangeFilter !== 'all') {
+        params.set('time_range', timeRangeFilter);
+    }
+    
+    // Add checkbox filters
+    const addCheckboxFilter = (paramName, className) => {
+        const values = Array.from(document.querySelectorAll(`.${className}:checked`)).map(cb => cb.value);
+        if (values.length > 0) {
+            params.set(paramName, values.join(','));
         }
+    };
+    
+    addCheckboxFilter('run_type', 'type-filter');
+    addCheckboxFilter('question_type', 'question-type-filter');
+    addCheckboxFilter('question_input_type', 'input-type-filter');
+    addCheckboxFilter('purpose', 'purpose-filter');
+    addCheckboxFilter('org_id', 'org-filter');
+    addCheckboxFilter('course_id', 'course-filter');
+    
+    // Update URL without page reload
+    const newUrl = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
+    window.history.pushState({}, '', newUrl);
+}
 
-        // Get type filters
-        const typeFilters = Array.from(document.querySelectorAll('.type-filter:checked')).map(cb => cb.value);
-        if (typeFilters.length > 0 && !passesTypeFilter(run, typeFilters)) {
-            return false;
+// Apply all filters (now fetches from backend)
+async function applyFilters(page = 1, saveToUrl = true) {
+    // Helper function to get filter values from DOM or URL fallback
+    function getFilterValue(domSelector, urlParam, defaultValue = null) {
+        const element = document.querySelector(domSelector);
+        if (element) {
+            return element.value;
         }
-
-        // Get question type filters
-        const questionTypeFilters = Array.from(document.querySelectorAll('.question-type-filter:checked')).map(cb => cb.value);
-        if (questionTypeFilters.length > 0 && !passesQuestionTypeFilter(run, questionTypeFilters)) {
-            return false;
+        // Fallback to URL if DOM element doesn't exist yet
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get(urlParam) || defaultValue;
+    }
+    
+    function getCheckboxValues(domSelector, urlParam) {
+        const elements = document.querySelectorAll(domSelector);
+        if (elements.length > 0) {
+            return Array.from(elements).filter(cb => cb.checked).map(cb => cb.value);
         }
+        // Fallback to URL if DOM elements don't exist yet
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlValue = urlParams.get(urlParam);
+        return urlValue ? urlValue.split(',') : [];
+    }
 
-        // Get input type filters
-        const inputTypeFilters = Array.from(document.querySelectorAll('.input-type-filter:checked')).map(cb => cb.value);
-        if (inputTypeFilters.length > 0 && !passesInputTypeFilter(run, inputTypeFilters)) {
-            return false;
-        }
+    // Gather filter values (from DOM if available, otherwise from URL)
+    const annotationFilter = getFilterValue('input[name="annotation"]:checked', 'annotation_filter', 'all');
+    const timeRangeFilter = getFilterValue('input[name="timerange"]:checked', 'time_range', 'all');
+    const typeFilters = getCheckboxValues('.type-filter:checked', 'run_type');
+    const questionTypeFilters = getCheckboxValues('.question-type-filter:checked', 'question_type');
+    const inputTypeFilters = getCheckboxValues('.input-type-filter:checked', 'question_input_type');
+    const purposeFilters = getCheckboxValues('.purpose-filter:checked', 'purpose');
+    const orgFilters = getCheckboxValues('.org-filter:checked', 'org_id');
+    const courseFilters = getCheckboxValues('.course-filter:checked', 'course_id');
 
-        // Get purpose filters
-        const purposeFilters = Array.from(document.querySelectorAll('.purpose-filter:checked')).map(cb => cb.value);
-        if (purposeFilters.length > 0 && !passesPurposeFilter(run, purposeFilters)) {
-            return false;
-        }
+    // Only save filter state to URL if this is a user-triggered change
+    if (saveToUrl) {
+        saveFiltersToURL(page);
+    }
 
-        // Get organization filters
-        const orgFilters = Array.from(document.querySelectorAll('.org-filter:checked')).map(cb => parseInt(cb.value));
-        if (orgFilters.length > 0 && !passesOrganizationFilter(run, orgFilters)) {
-            return false;
-        }
+    // Build query params for API
+    const params = new URLSearchParams();
+    params.append('page', page);
+    params.append('page_size', pageSize);
+    if (annotationFilter && annotationFilter !== 'all') params.append('annotation_filter', annotationFilter);
+    if (timeRangeFilter && timeRangeFilter !== 'all') params.append('time_range', timeRangeFilter);
+    if (typeFilters.length > 0) params.append('run_type', typeFilters.join(','));
+    if (questionTypeFilters.length > 0) params.append('question_type', questionTypeFilters.join(','));
+    if (inputTypeFilters.length > 0) params.append('question_input_type', inputTypeFilters.join(','));
+    if (purposeFilters.length > 0) params.append('purpose', purposeFilters.join(','));
+    if (orgFilters.length > 0) params.append('org_id', orgFilters.join(','));
+    if (courseFilters.length > 0) params.append('course_id', courseFilters.join(','));
 
-        // Get course filters
-        const courseFilters = Array.from(document.querySelectorAll('.course-filter:checked')).map(cb => parseInt(cb.value));
-        if (courseFilters.length > 0 && !passesCourseFilter(run, courseFilters)) {
-            return false;
-        }
-
-        return true;
-    });
-
-    // Reset pagination when filters are applied
-    totalPages = Math.ceil(filteredRuns.length / pageSize);
-    currentPage = 1;
+    // Fetch filtered/paginated data from backend
+    try {
+        const response = await fetch(`/api/runs?${params.toString()}`);
+        const data = await response.json();
+        if (data.error) throw new Error(data.error);
+        
+        runsData = data.runs || [];
+        filteredRuns = runsData; // For compatibility with existing code
+        totalPages = data.total_pages || 1;
+        totalCount = data.total_count || 0;
+        currentPage = data.current_page || 1;
     
     // Reset selection state when filters are applied
     allRunsSelected = false;
     selectedRunIds.clear();
     
     updateRunsDisplay();
-    updateRunsCount();
-    updateAnnotatedCount();
     updatePagination();
+        updateRunsCount();
+        
+    } catch (error) {
+        console.error('Error applying filters:', error);
+        // Show error message
+        const runsList = document.getElementById('runsList');
+        if (runsList) {
+            runsList.innerHTML = `<div class="flex items-center justify-center py-12"><div class="text-center"><div class="text-red-500 text-xl mb-4">⚠️</div><p class="text-red-600 text-lg">Error loading runs</p><p class="text-gray-600">${error.message}</p></div></div>`;
+        }
+    }
 }
 
 // Individual filter functions
@@ -466,21 +542,15 @@ function getAnnotationStatus(run) {
 function updateRunsCount() {
     const headerElement = document.getElementById('runsHeader');
     if (headerElement) {
-        const totalRuns = runsData.length;
-        const filteredCount = filteredRuns.length;
-        
-        if (filteredCount === totalRuns) {
-            headerElement.textContent = `All runs (${totalRuns})`;
-        } else {
-            headerElement.textContent = `All runs (${filteredCount} of ${totalRuns})`;
-        }
+        // No filters applied or all results fit on current view
+        headerElement.textContent = `All runs (${totalCount})`;
     }
     
     // Also update annotated count to keep both labels in sync
     updateAnnotatedCount();
 }
 
-// Calculate annotated count for filtered runs
+// Calculate annotated count for current page runs
 function getAnnotatedCount(runs) {
     return runs.filter(run => {
         if (!run.annotations || !currentUser) return false;
@@ -501,26 +571,21 @@ function getAnnotatedCount(runs) {
 function updateAnnotatedCount() {
     const annotatedCountElement = document.getElementById('annotatedCount');
     if (annotatedCountElement) {
-        const filteredAnnotatedCount = getAnnotatedCount(filteredRuns);
-        const totalRuns = runsData.length;
-        
-        if (filteredRuns.length === totalRuns) {
-            // No filters applied, show total counts
-            annotatedCountElement.textContent = `Annotated ${filteredAnnotatedCount}/${totalRuns}`;
-        } else {
-            // Filters applied, show filtered counts
-            annotatedCountElement.textContent = `Annotated ${filteredAnnotatedCount}/${filteredRuns.length}`;
-        }
+        const currentPageAnnotatedCount = getAnnotatedCount(runsData);
+        // Since we only have current page data, show count for current page
+        annotatedCountElement.textContent = `Annotated ${currentPageAnnotatedCount}/${runsData.length} (page ${currentPage})`;
     }
 }
 
 // Clear all filters
 function clearAllFilters() {
     // Reset annotation filter
-    document.querySelector('input[name="annotation"][value="all"]').checked = true;
+    const allAnnotationRadio = document.querySelector('input[name="annotation"][value="all"]');
+    if (allAnnotationRadio) allAnnotationRadio.checked = true;
     
     // Reset time range filter
-    document.querySelector('input[name="timerange"][value="all"]').checked = true;
+    const allTimeRangeRadio = document.querySelector('input[name="timerange"][value="all"]');
+    if (allTimeRangeRadio) allTimeRangeRadio.checked = true;
     
     // Reset all checkboxes
     document.querySelectorAll('.type-filter, .question-type-filter, .input-type-filter, .purpose-filter, .org-filter, .course-filter').forEach(cb => {
@@ -528,15 +593,18 @@ function clearAllFilters() {
     });
     
     // Clear search boxes
-    document.getElementById('orgSearch').value = '';
-    document.getElementById('courseSearch').value = '';
+    const orgSearch = document.getElementById('orgSearch');
+    const courseSearch = document.getElementById('courseSearch');
+    if (orgSearch) orgSearch.value = '';
+    if (courseSearch) courseSearch.value = '';
     
     // Show all organizations and courses
     filterOrganizations();
     filterCourses();
     
-    // Apply filters (which will show all runs and reset pagination)
-    applyFilters();
+    // Clear URL and apply filters
+    window.history.pushState({}, '', window.location.pathname);
+    applyFilters(1, true); // Don't update sidebar when clearing filters
 }
 
 // Filter organizations based on search
@@ -719,22 +787,26 @@ function generateRunsHTML(sortedRuns, startIndex) {
         
         runsHtml += `
             <div class="border-b border-gray-100 px-6 py-4 hover:bg-gray-50">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-3">
-                        <input type="checkbox" id="rowCheckbox_${runId}" class="row-checkbox w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" onchange="updateSelectedCount()">
+                <div class="flex items-start justify-between">
+                    <div class="flex items-start space-x-3 pr-8">
+                        <div class="flex-shrink-0 mt-1">
+                            <input type="checkbox" id="rowCheckbox_${runId}" class="row-checkbox w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" onchange="updateSelectedCount()">
+                        </div>
                         <div>
-                            <div class="text-sm font-medium text-gray-900">${runName}</div>
+                            <div class="text-sm font-medium text-gray-900 leading-5">${runName}</div>
                             <div class="flex items-center space-x-2 mt-1">
                                 ${tagBadges}
                             </div>
                         </div>
                     </div>
-                    <div class="flex items-center space-x-8">
+                    <div class="flex items-center space-x-8 flex-shrink-0">
                         <div class="flex items-center justify-center w-12">
                             ${annotationIcon}
                         </div>
-                        <span class="text-sm text-gray-500">${formattedTimestamp}</span>
-                        <div class="invisible">
+                        <div class="w-32 text-right">
+                            <span class="text-sm text-gray-500">${formattedTimestamp}</span>
+                        </div>
+                        <div class="w-5 h-5 invisible">
                             <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                             </svg>
@@ -749,16 +821,11 @@ function generateRunsHTML(sortedRuns, startIndex) {
 
 // Update runs display
 function updateRunsDisplay() {
-    const sortedRuns = sortRuns(filteredRuns, currentSort.by, currentSort.order);
-    
-    // Calculate pagination slice
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    const currentPageRuns = sortedRuns.slice(startIndex, endIndex);
+    const sortedRuns = sortRuns(runsData, currentSort.by, currentSort.order);
     
     const runsListElement = document.getElementById('runsList');
     if (runsListElement) {
-        runsListElement.innerHTML = generateRunsHTML(currentPageRuns, startIndex);
+        runsListElement.innerHTML = generateRunsHTML(sortedRuns, 0);
         
         // Restore selection state for current page
         const rowCheckboxes = document.querySelectorAll('.row-checkbox');
@@ -952,9 +1019,9 @@ function updatePagination() {
     
     // Update pagination info
     const startIndex = (currentPage - 1) * pageSize + 1;
-    const endIndex = Math.min(currentPage * pageSize, filteredRuns.length);
+    const endIndex = Math.min(currentPage * pageSize, totalCount);
     paginationInfo.textContent = `${startIndex}-${endIndex}`;
-    totalRunsCount.textContent = filteredRuns.length;
+    totalRunsCount.textContent = totalCount;
     
     // Update navigation buttons
     prevPageBtn.disabled = currentPage === 1;
@@ -1024,8 +1091,7 @@ function addEllipsis(container) {
 function goToPage(pageNum) {
     if (pageNum >= 1 && pageNum <= totalPages && pageNum !== currentPage) {
         currentPage = pageNum;
-        updateRunsDisplay();
-        updatePagination();
+        applyFilters(pageNum, true); // Don't update sidebar when paginating
     }
 }
 

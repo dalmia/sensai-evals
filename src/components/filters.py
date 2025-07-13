@@ -72,10 +72,6 @@ def create_filters_sidebar(organizations=None, courses=None):
                         <span class="ml-2 text-sm text-gray-700">All Time</span>
                     </label>
                     <label class="flex items-center">
-                        <input type="radio" name="timerange" value="today" class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" onchange="applyFilters()">
-                        <span class="ml-2 text-sm text-gray-700">Today</span>
-                    </label>
-                    <label class="flex items-center">
                         <input type="radio" name="timerange" value="yesterday" class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" onchange="applyFilters()">
                         <span class="ml-2 text-sm text-gray-700">Yesterday</span>
                     </label>

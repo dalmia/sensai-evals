@@ -542,49 +542,33 @@ async def create_annotation(
 
 async def fetch_all_runs(
     annotation_filter: str = None,
+    annotation_filter_user_id: int = None,
     time_range: str = None,
-    org_name: str = None,
-    course_name: str = None,
-    run_type: str = None,
-    purpose: str = None,
-    question_type: str = None,
-    question_input_type: str = None,
+    org_id: list = None,
+    course_id: list = None,
+    run_type: list = None,
+    purpose: list = None,
+    question_type: list = None,
+    question_input_type: list = None,
+    page: int = 1,
+    page_size: int = 20,
 ):
     """
-    Fetch runs from the database with their annotations, filtered by query parameters.
-
-    Args:
-        annotation_filter: Filter by annotation status
-            - "has_annotations": Only runs with any annotations
-            - "no_annotations": Only runs without annotations
-            - "correct": Only runs with judgement = "correct" in annotations
-            - "wrong": Only runs with judgement = "wrong" in annotations
-        time_range: Filter by time range
-            - "today": Runs created today
-            - "yesterday": Runs created yesterday
-            - "last_7_days": Runs created in last 7 days
-            - "last_30_days": Runs created in last 30 days
-        org_name: Filter by organization name in metadata
-        course_name: Filter by course name in metadata
-        run_type: Filter by run type in metadata ("quiz" or "learning_material")
-        purpose: Filter by purpose in metadata ("exam" or "practice")
-        question_type: Filter by question type in metadata ("objective" or "subjective")
-        question_input_type: Filter by question input type in metadata ("code" or "text")
-
-    Returns:
-        List of dictionaries containing run data with annotations
+    Fetch runs from the database with their annotations, filtered by query parameters and paginated.
+    Returns a tuple: (runs, total_count)
     """
     async with get_new_db_connection() as conn:
         cursor = await conn.cursor()
 
         # Build the base query
-        query = f"""
+        base_query = f"""
             SELECT r.id, r.run_id, r.start_time, r.end_time, r.messages, r.metadata, r.created_at,
                    a.judgement, a.notes, a.created_at as timestamp, u.name as username
             FROM {runs_table_name} r
             LEFT JOIN {annotations_table_name} a ON r.id = a.run_id
             LEFT JOIN {users_table_name} u ON a.user_id = u.id
         """
+        count_query = f"SELECT COUNT(DISTINCT r.id) FROM {runs_table_name} r LEFT JOIN {annotations_table_name} a ON r.id = a.run_id LEFT JOIN {users_table_name} u ON a.user_id = u.id"
 
         # Build WHERE clause based on filters
         where_conditions = []
@@ -593,60 +577,95 @@ async def fetch_all_runs(
         # Time range filter
         if time_range:
             if time_range == "today":
-                where_conditions.append("DATE(r.created_at) = DATE('now')")
+                where_conditions.append("DATE(r.start_time) = DATE('now')")
             elif time_range == "yesterday":
-                where_conditions.append("DATE(r.created_at) = DATE('now', '-1 day')")
-            elif time_range == "last_7_days":
-                where_conditions.append("r.created_at >= DATE('now', '-7 days')")
-            elif time_range == "last_30_days":
-                where_conditions.append("r.created_at >= DATE('now', '-30 days')")
+                where_conditions.append("DATE(r.start_time) = DATE('now', '-1 day')")
+            elif time_range == "last7" or time_range == "last_7_days":
+                where_conditions.append("r.start_time >= DATE('now', '-7 days')")
+            elif time_range == "last30" or time_range == "last_30_days":
+                where_conditions.append("r.start_time >= DATE('now', '-30 days')")
 
-        # Annotation filter
+        # Annotation filter - now user-specific when annotation_filter_user_id is provided
         if annotation_filter:
-            if annotation_filter == "has_annotations":
-                where_conditions.append("a.id IS NOT NULL")
-            elif annotation_filter == "no_annotations":
-                where_conditions.append("a.id IS NULL")
-            elif annotation_filter == "correct":
-                where_conditions.append("a.judgement = 'correct'")
-            elif annotation_filter == "wrong":
-                where_conditions.append("a.judgement = 'wrong'")
+            if annotation_filter_user_id:
+                # Filter annotations for specific user only
+                if (
+                    annotation_filter == "annotated"
+                    or annotation_filter == "has_annotations"
+                ):
+                    where_conditions.append("a.id IS NOT NULL AND a.user_id = ?")
+                    params.append(annotation_filter_user_id)
+                elif (
+                    annotation_filter == "unannotated"
+                    or annotation_filter == "no_annotations"
+                ):
+                    where_conditions.append(
+                        f"""r.id NOT IN (
+                        SELECT DISTINCT run_id FROM {annotations_table_name} 
+                        WHERE user_id = ?
+                    )"""
+                    )
+                    params.append(annotation_filter_user_id)
+                elif annotation_filter == "correct":
+                    where_conditions.append("a.judgement = 'correct' AND a.user_id = ?")
+                    params.append(annotation_filter_user_id)
+                elif annotation_filter == "wrong":
+                    where_conditions.append("a.judgement = 'wrong' AND a.user_id = ?")
+                    params.append(annotation_filter_user_id)
+            else:
+                # Original logic for any user annotations
+                if (
+                    annotation_filter == "annotated"
+                    or annotation_filter == "has_annotations"
+                ):
+                    where_conditions.append("a.id IS NOT NULL")
+                elif (
+                    annotation_filter == "unannotated"
+                    or annotation_filter == "no_annotations"
+                ):
+                    where_conditions.append("a.id IS NULL")
+                elif annotation_filter == "correct":
+                    where_conditions.append("a.judgement = 'correct'")
+                elif annotation_filter == "wrong":
+                    where_conditions.append("a.judgement = 'wrong'")
 
-        # Metadata filters
-        if org_name:
-            where_conditions.append("JSON_EXTRACT(r.metadata, '$.org.name') = ?")
-            params.append(org_name)
+        # Metadata filters (support multiple values)
+        def add_multi_filter(field, values, json_path):
+            if values:
+                placeholders = ",".join(["?"] * len(values))
+                where_conditions.append(
+                    f"JSON_EXTRACT(r.metadata, '{json_path}') IN ({placeholders})"
+                )
+                params.extend(values)
 
-        if course_name:
-            where_conditions.append("JSON_EXTRACT(r.metadata, '$.course.name') = ?")
-            params.append(course_name)
-
-        if run_type:
-            where_conditions.append("JSON_EXTRACT(r.metadata, '$.type') = ?")
-            params.append(run_type)
-
-        if purpose:
-            where_conditions.append("JSON_EXTRACT(r.metadata, '$.purpose') = ?")
-            params.append(purpose)
-
-        if question_type:
-            where_conditions.append("JSON_EXTRACT(r.metadata, '$.question_type') = ?")
-            params.append(question_type)
-
-        if question_input_type:
-            where_conditions.append(
-                "JSON_EXTRACT(r.metadata, '$.question_input_type') = ?"
-            )
-            params.append(question_input_type)
+        add_multi_filter("org_id", org_id, "$.org.id")
+        add_multi_filter("course_id", course_id, "$.course.id")
+        add_multi_filter("run_type", run_type, "$.type")
+        add_multi_filter("purpose", purpose, "$.question_purpose")
+        add_multi_filter("question_type", question_type, "$.question_type")
+        add_multi_filter(
+            "question_input_type", question_input_type, "$.question_input_type"
+        )
 
         # Add WHERE clause if there are conditions
+        where_clause = ""
         if where_conditions:
-            query += " WHERE " + " AND ".join(where_conditions)
+            where_clause = " WHERE " + " AND ".join(where_conditions)
 
-        query += " ORDER BY r.created_at DESC LIMIT 50"
+        # Get total count for pagination
+        await cursor.execute(count_query + where_clause, params)
+        total_count = await cursor.fetchone()
+        total_count = total_count[0] if total_count else 0
+
+        # Add ORDER, LIMIT, OFFSET for pagination
+        offset = (page - 1) * page_size
+        query = (
+            base_query + where_clause + f" ORDER BY r.created_at DESC LIMIT ? OFFSET ?"
+        )
+        page_params = params + [page_size, offset]
 
         # Execute query with parameters
-        await cursor.execute(query, params)
+        await cursor.execute(query, page_params)
         rows = await cursor.fetchall()
 
         # Convert rows to list of dictionaries with annotations
@@ -655,12 +674,10 @@ async def fetch_all_runs(
 
         for row in rows:
             run_id = row[0]
-
             # If this is a new run, create a new run entry
             if current_run is None or current_run["id"] != run_id:
                 if current_run is not None:
                     runs.append(current_run)
-
                 current_run = {
                     "id": row[0],
                     "run_id": row[1],
@@ -675,7 +692,6 @@ async def fetch_all_runs(
                     "created_at": row[6],
                     "annotations": {},
                 }
-
             # Add annotation if it exists (username is not None)
             if row[10] is not None:  # username is not None
                 current_run["annotations"][row[10]] = {
@@ -683,12 +699,10 @@ async def fetch_all_runs(
                     "notes": row[8],
                     "timestamp": row[9],
                 }
-
         # Add the last run
         if current_run is not None:
             runs.append(current_run)
-
-        return runs
+        return runs, total_count
 
 
 @log_exceptions
@@ -725,3 +739,60 @@ async def get_all_users():
         await cursor.execute(f"""SELECT id, name FROM {users_table_name}""")
         rows = await cursor.fetchall()
         return [{"id": row[0], "name": row[1]} for row in rows]
+
+
+async def get_unique_orgs_and_courses():
+    """
+    Fetch unique organization and course names and ids from the metadata of all runs.
+    Returns:
+        {
+            "orgs": [{"id": ..., "name": ...}, ...],
+            "courses": [{"id": ..., "name": ...}, ...]
+        }
+    """
+    async with get_new_db_connection() as conn:
+        cursor = await conn.cursor()
+        await cursor.execute(f"SELECT metadata FROM {runs_table_name}")
+        rows = await cursor.fetchall()
+
+        orgs_set = set()
+        courses_set = set()
+
+        for row in rows:
+            metadata = row[0]
+            if not metadata:
+                continue
+            try:
+                # metadata may be a JSON string
+                import json
+
+                meta = json.loads(metadata)
+            except Exception:
+                continue
+
+            org = meta.get("org")
+            if org and isinstance(org, dict):
+                org_id = org.get("id")
+                org_name = org.get("name")
+                if org_id is not None and org_name is not None:
+                    orgs_set.add((org_id, org_name))
+
+            course = meta.get("course")
+            if course and isinstance(course, dict):
+                course_id = course.get("id")
+                course_name = course.get("name")
+                if course_id is not None and course_name is not None:
+                    courses_set.add((course_id, course_name))
+
+        orgs = [
+            {"id": oid, "name": oname}
+            for oid, oname in sorted(orgs_set, key=lambda x: (str(x[1]).lower(), x[0]))
+        ]
+        courses = [
+            {"id": cid, "name": cname}
+            for cid, cname in sorted(
+                courses_set, key=lambda x: (str(x[1]).lower(), x[0])
+            )
+        ]
+
+        return {"orgs": orgs, "courses": courses}

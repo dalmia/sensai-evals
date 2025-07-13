@@ -120,6 +120,9 @@ def runs_page(request):
         
         {runs_script}
         <script>
+            // Set current user for annotation display
+            currentUser = '{user}';
+            
             // Load data from API when page loads
             window.addEventListener('DOMContentLoaded', function() {{
                 loadRunsData();

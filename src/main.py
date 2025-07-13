@@ -55,7 +55,7 @@ def queues(request):
 @app.get("/queues/{queue_id}")
 def queue_detail(request, queue_id: str):
     """Individual queue page route - delegates to individual queue page"""
-    return individual_queue_page(request, queue_id, None)
+    return individual_queue_page(request, queue_id)
 
 
 @app.get("/login")

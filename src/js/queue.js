@@ -6,6 +6,98 @@ let selectedAnnotator = '';
 let currentRunIndex = null; // Track currently selected run
 let navigatingFromSidebar = false; // Track if navigation is from within a sidebar
 
+// Load queue data from API
+async function loadQueueData(queueId, user, selectedRunId = '') {
+    selectedAnnotator = user; // Set default annotator to logged-in user
+    
+    try {
+        const response = await fetch(`/api/queues/${queueId}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        queueData = data.queue || {};
+        runsData = queueData.runs || [];
+        
+        // Update the UI
+        updateQueueHeader();
+        updateRunsDisplay();
+        
+        // Check if there's a runId in URL to restore
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlRunId = urlParams.get('runId');
+        
+        if (urlRunId && runsData.length > 0) {
+            // Find the run with matching runId
+            const runIndex = runsData.findIndex(run => run.id === Number(urlRunId));
+            if (runIndex !== -1) {
+                selectRun(runIndex);
+                return;
+            }
+        } else if (selectedRunId && runsData.length > 0) {
+            // Find the run with matching selectedRunId from server
+            const runIndex = runsData.findIndex(run => run.id === selectedRunId);
+            if (runIndex !== -1) {
+                selectRun(runIndex);
+                return;
+            }
+        }
+        
+        // Automatically select the first run if available and no URL run was found
+        if (runsData.length > 0) {
+            selectRun(0);
+        }
+        
+        // Hide loading spinner after data is loaded
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        if (loadingSpinner) {
+            loadingSpinner.style.display = 'none';
+        }
+        
+    } catch (error) {
+        console.error('Error loading queue data:', error);
+        
+        // Show error message
+        const mainContent = document.getElementById('mainContent');
+        if (mainContent) {
+            mainContent.innerHTML = `
+                <div class="bg-white rounded-lg shadow-sm flex items-center justify-center" style="height: calc(100vh - 120px);">
+                    <div class="text-center">
+                        <div class="text-red-500 text-xl mb-4">⚠️</div>
+                        <h3 class="text-lg font-medium text-red-600 mb-2">Error loading queue</h3>
+                        <p class="text-sm text-gray-600 mb-4">${error.message}</p>
+                        <button onclick="loadQueueData(${queueId}, '${user}', '${selectedRunId}')" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Also update the queue header to show error
+        const queueHeader = document.getElementById('queueHeader');
+        const queueCreator = document.getElementById('queueCreator');
+        if (queueHeader) queueHeader.textContent = 'Error loading queue';
+        if (queueCreator) queueCreator.textContent = 'Please try again';
+    }
+}
+
+// Update queue header with data
+function updateQueueHeader() {
+    const queueHeader = document.getElementById('queueHeader');
+    const queueCreator = document.getElementById('queueCreator');
+    
+    if (queueHeader && queueData.name) {
+        queueHeader.textContent = `${queueData.name} (${runsData.length})`;
+    }
+    
+    if (queueCreator && queueData.user_name) {
+        queueCreator.textContent = `Created by ${queueData.user_name}`;
+    }
+}
+
 // Initialize queue data
 function initializeQueueData(data) {
     queueData = data.queue;

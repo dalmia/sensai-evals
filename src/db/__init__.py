@@ -258,6 +258,7 @@ async def get_queue(queue_id: int):
             LEFT JOIN {users_table_name} ann_user ON a.user_id = ann_user.id
             WHERE q.id = ?
             ORDER BY r.created_at DESC
+            LIMIT 20
             """,
             (queue_id,),
         )

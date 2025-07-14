@@ -179,15 +179,18 @@ async def get_runs_api(request: Request):
         purpose = parse_multi(purpose)
         question_type = parse_multi(question_type)
         question_input_type = parse_multi(question_input_type)
-        org_id = parse_multi(org_id)
-        course_id = parse_multi(course_id)
+        org_ids = parse_multi(org_id)
+        course_ids = parse_multi(course_id)
+
+        org_ids = [int(id) for id in org_ids] if org_ids else None
+        course_ids = [int(id) for id in course_ids] if course_ids else None
 
         # Call fetch_all_runs with all filters and pagination
         runs_data, total_count = await fetch_all_runs(
             annotation_filter=annotation_filter,
             time_range=time_range,
-            org_id=org_id,
-            course_id=course_id,
+            org_ids=org_ids,
+            course_ids=course_ids,
             run_type=run_type,
             purpose=purpose,
             question_type=question_type,

@@ -257,9 +257,9 @@ async def create_user(name: str):
         return cursor.lastrowid
 
 
-async def get_queue(queue_id: int):
+async def get_queue(queue_id: int, page: int = 1, page_size: int = 20):
     """
-    Get a queue with its associated user information and runs with annotations.
+    Get a queue with its associated user information and runs with annotations, with pagination support.
     """
     async with get_new_db_connection() as conn:
         cursor = await conn.cursor()
@@ -282,6 +282,8 @@ async def get_queue(queue_id: int):
             "created_at": queue_details[4],
         }
 
+        offset = (page - 1) * page_size
+
         await cursor.execute(
             f"""
                 SELECT r.id as run_id, r.run_id as span_id, r.start_time, r.end_time, r.messages, r.metadata, r.created_at as run_created_at, a.judgement, a.notes, a.created_at as annotation_timestamp, ann_user.name as annotation_username
@@ -292,9 +294,9 @@ async def get_queue(queue_id: int):
             LEFT JOIN {users_table_name} ann_user ON a.user_id = ann_user.id
             WHERE q.id = ?
             ORDER BY r.created_at DESC
-            LIMIT 20
+            LIMIT ? OFFSET ?
             """,
-            (queue_id,),
+            (queue_id, page_size, offset),
         )
 
         rows = await cursor.fetchall()
@@ -544,8 +546,8 @@ async def fetch_all_runs(
     annotation_filter: str = None,
     annotation_filter_user_id: int = None,
     time_range: str = None,
-    org_id: list = None,
-    course_id: list = None,
+    org_ids: list = None,
+    course_ids: list = None,
     run_type: list = None,
     purpose: list = None,
     question_type: list = None,
@@ -638,8 +640,8 @@ async def fetch_all_runs(
                 )
                 params.extend(values)
 
-        add_multi_filter("org_id", org_id, "$.org.id")
-        add_multi_filter("course_id", course_id, "$.course.id")
+        add_multi_filter("org_id", org_ids, "$.org.id")
+        add_multi_filter("course_id", course_ids, "$.course.id")
         add_multi_filter("run_type", run_type, "$.type")
         add_multi_filter("purpose", purpose, "$.question_purpose")
         add_multi_filter("question_type", question_type, "$.question_type")

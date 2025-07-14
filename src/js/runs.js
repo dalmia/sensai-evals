@@ -30,7 +30,7 @@ async function loadRunsData() {
             
             const [filterResponse, runsResponse] = await Promise.all([
                 fetch('/api/filter_data'),
-                applyFilters(page, false) // Pass false for initial load
+                applyFilters(page, false)
             ]);
             
             // Handle filter data response and update sidebar immediately
@@ -52,7 +52,7 @@ async function loadRunsData() {
             // Filter data already available, just fetch runs
             const urlParams = new URLSearchParams(window.location.search);
             const page = parseInt(urlParams.get('page')) || 1;
-            await applyFilters(page, false); // Pass false for initial load
+            await applyFilters(page, false);
         }
         
         // Hide loading spinner
@@ -107,144 +107,150 @@ function updateFiltersSidebar() {
 // Generate filters HTML
 function generateFiltersHTML(organizations, courses) {
     return `
-        <div class="p-4">
-            <div class="mb-6 flex items-center justify-between">
-                <h3 class="text-lg font-medium text-gray-900">Filters</h3>
-                <button onclick="clearAllFilters()" class="text-sm text-blue-600 hover:text-blue-800">
-                    Clear
-                </button>
-            </div>
-            <div class="mb-4">
-                <button id="applyFiltersBtn" class="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700" onclick="applyFilters()">Apply Filter</button>
-            </div>
-            <!-- Annotation Status Filter -->
-            <div class="mb-6">
-                <h4 class="text-sm font-medium text-gray-700 mb-3">Annotation Status</h4>
-                <div class="space-y-2">
-                    <label class="flex items-center">
-                        <input type="radio" name="annotation" value="all" checked class="mr-2">
-                        <span class="text-sm text-gray-700">All</span>
-                    </label>
-                    <label class="flex items-center">
-                        <input type="radio" name="annotation" value="annotated" class="mr-2">
-                        <span class="text-sm text-gray-700">Annotated</span>
-                    </label>
-                    <label class="flex items-center">
-                        <input type="radio" name="annotation" value="unannotated" class="mr-2">
-                        <span class="text-sm text-gray-700">Unannotated</span>
-                    </label>
-                    <label class="flex items-center">
-                        <input type="radio" name="annotation" value="correct" class="mr-2">
-                        <span class="text-sm text-gray-700">Correct</span>
-                    </label>
-                    <label class="flex items-center">
-                        <input type="radio" name="annotation" value="wrong" class="mr-2">
-                        <span class="text-sm text-gray-700">Wrong</span>
-                    </label>
+        <div class="h-full flex flex-col">
+            <!-- Sticky Top: Title, Clear, Apply Filter -->
+            <div class="sticky top-0 z-10 bg-white p-4 pb-2 border-b border-gray-100">
+                <div class="mb-4 flex items-center justify-between">
+                    <h3 class="text-lg font-medium text-gray-900">Filters</h3>
+                    <button onclick="clearAllFilters()" class="text-sm text-blue-600 hover:text-blue-800">
+                        Clear
+                    </button>
+                </div>
+                <div class="mb-2">
+                    <button id="applyFiltersBtn" class="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700" onclick="applyFilters()">Apply Filter</button>
                 </div>
             </div>
-            <!-- Time Range Filter -->
-            <div class="mb-6">
-                <h4 class="text-sm font-medium text-gray-700 mb-3">Time Range</h4>
-                <div class="space-y-2">
-                    <label class="flex items-center">
-                        <input type="radio" name="timerange" value="all" checked class="mr-2">
-                        <span class="text-sm text-gray-700">All time</span>
-                    </label>
-                    <label class="flex items-center">
-                        <input type="radio" name="timerange" value="yesterday" class="mr-2">
-                        <span class="text-sm text-gray-700">Yesterday</span>
-                    </label>
-                    <label class="flex items-center">
-                        <input type="radio" name="timerange" value="last7" class="mr-2">
-                        <span class="text-sm text-gray-700">Last 7 days</span>
-                    </label>
-                    <label class="flex items-center">
-                        <input type="radio" name="timerange" value="last30" class="mr-2">
-                        <span class="text-sm text-gray-700">Last 30 days</span>
-                    </label>
-                </div>
-            </div>
-            <!-- Type Filter -->
-            <div class="mb-6">
-                <h4 class="text-sm font-medium text-gray-700 mb-3">Type</h4>
-                <div class="space-y-2">
-                    <label class="flex items-center">
-                        <input type="checkbox" class="type-filter mr-2" value="quiz">
-                        <span class="text-sm text-gray-700">Quiz</span>
-                    </label>
-                    <label class="flex items-center">
-                        <input type="checkbox" class="type-filter mr-2" value="learning_material">
-                        <span class="text-sm text-gray-700">Learning Material</span>
-                    </label>
-                </div>
-            </div>
-            <!-- Question Type Filter -->
-            <div class="mb-6">
-                <h4 class="text-sm font-medium text-gray-700 mb-3">Question Type</h4>
-                <div class="space-y-2">
-                    <label class="flex items-center">
-                        <input type="checkbox" class="question-type-filter mr-2" value="subjective">
-                        <span class="text-sm text-gray-700">Subjective</span>
-                    </label>
-                    <label class="flex items-center">
-                        <input type="checkbox" class="question-type-filter mr-2" value="objective">
-                        <span class="text-sm text-gray-700">Objective</span>
-                    </label>
-                </div>
-            </div>
-            <!-- Input Type Filter -->
-            <div class="mb-6">
-                <h4 class="text-sm font-medium text-gray-700 mb-3">Input Type</h4>
-                <div class="space-y-2">
-                    <label class="flex items-center">
-                        <input type="checkbox" class="input-type-filter mr-2" value="text">
-                        <span class="text-sm text-gray-700">text</span>
-                    </label>
-                    <label class="flex items-center">
-                        <input type="checkbox" class="input-type-filter mr-2" value="code">
-                        <span class="text-sm text-gray-700">code</span>
-                    </label>
-                </div>
-            </div>
-            <!-- Purpose Filter -->
-            <div class="mb-6">
-                <h4 class="text-sm font-medium text-gray-700 mb-3">Purpose</h4>
-                <div class="space-y-2">
-                    <label class="flex items-center">
-                        <input type="checkbox" class="purpose-filter mr-2" value="practice">
-                        <span class="text-sm text-gray-700">Practice</span>
-                    </label>
-                    <label class="flex items-center">
-                        <input type="checkbox" class="purpose-filter mr-2" value="exam">
-                        <span class="text-sm text-gray-700">Exam</span>
-                    </label>
-                </div>
-            </div>
-            <!-- Organization Filter -->
-            <div class="mb-6">
-                <h4 class="text-sm font-medium text-gray-700 mb-3">Organization</h4>
-                <input type="text" id="orgSearch" placeholder="Search organizations..." class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md mb-3" onkeyup="filterOrganizations()">
-                <div id="orgList" class="space-y-2 max-h-40 overflow-y-auto">
-                    ${organizations.map(org => `
+            <!-- Scrollable Filters -->
+            <div class="flex-1 overflow-y-auto p-4 pt-2">
+                <!-- Annotation Status Filter -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-medium text-gray-700 mb-3">Annotation Status</h4>
+                    <div class="space-y-2">
                         <label class="flex items-center">
-                            <input type="checkbox" class="org-filter mr-2" value="${org.id}">
-                            <span class="text-sm text-gray-700">${org.name}</span>
+                            <input type="radio" name="annotation" value="all" checked class="mr-2">
+                            <span class="text-sm text-gray-700">All</span>
                         </label>
-                    `).join('')}
-                </div>
-            </div>
-            <!-- Course Filter -->
-            <div class="mb-6">
-                <h4 class="text-sm font-medium text-gray-700 mb-3">Course</h4>
-                <input type="text" id="courseSearch" placeholder="Search courses..." class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md mb-3" onkeyup="filterCourses()">
-                <div id="courseList" class="space-y-2 max-h-40 overflow-y-auto">
-                    ${courses.map(course => `
                         <label class="flex items-center">
-                            <input type="checkbox" class="course-filter mr-2" value="${course.id}">
-                            <span class="text-sm text-gray-700">${course.name}</span>
+                            <input type="radio" name="annotation" value="annotated" class="mr-2">
+                            <span class="text-sm text-gray-700">Annotated</span>
                         </label>
-                    `).join('')}
+                        <label class="flex items-center">
+                            <input type="radio" name="annotation" value="unannotated" class="mr-2">
+                            <span class="text-sm text-gray-700">Unannotated</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="annotation" value="correct" class="mr-2">
+                            <span class="text-sm text-gray-700">Correct</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="annotation" value="wrong" class="mr-2">
+                            <span class="text-sm text-gray-700">Wrong</span>
+                        </label>
+                    </div>
+                </div>
+                <!-- Time Range Filter -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-medium text-gray-700 mb-3">Time Range</h4>
+                    <div class="space-y-2">
+                        <label class="flex items-center">
+                            <input type="radio" name="timerange" value="all" checked class="mr-2">
+                            <span class="text-sm text-gray-700">All time</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="timerange" value="yesterday" class="mr-2">
+                            <span class="text-sm text-gray-700">Yesterday</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="timerange" value="last7" class="mr-2">
+                            <span class="text-sm text-gray-700">Last 7 days</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="timerange" value="last30" class="mr-2">
+                            <span class="text-sm text-gray-700">Last 30 days</span>
+                        </label>
+                    </div>
+                </div>
+                <!-- Type Filter -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-medium text-gray-700 mb-3">Type</h4>
+                    <div class="space-y-2">
+                        <label class="flex items-center">
+                            <input type="checkbox" class="type-filter mr-2" value="quiz">
+                            <span class="text-sm text-gray-700">Quiz</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" class="type-filter mr-2" value="learning_material">
+                            <span class="text-sm text-gray-700">Learning Material</span>
+                        </label>
+                    </div>
+                </div>
+                <!-- Question Type Filter -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-medium text-gray-700 mb-3">Question Type</h4>
+                    <div class="space-y-2">
+                        <label class="flex items-center">
+                            <input type="checkbox" class="question-type-filter mr-2" value="subjective">
+                            <span class="text-sm text-gray-700">Subjective</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" class="question-type-filter mr-2" value="objective">
+                            <span class="text-sm text-gray-700">Objective</span>
+                        </label>
+                    </div>
+                </div>
+                <!-- Input Type Filter -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-medium text-gray-700 mb-3">Input Type</h4>
+                    <div class="space-y-2">
+                        <label class="flex items-center">
+                            <input type="checkbox" class="input-type-filter mr-2" value="text">
+                            <span class="text-sm text-gray-700">text</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" class="input-type-filter mr-2" value="code">
+                            <span class="text-sm text-gray-700">code</span>
+                        </label>
+                    </div>
+                </div>
+                <!-- Purpose Filter -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-medium text-gray-700 mb-3">Purpose</h4>
+                    <div class="space-y-2">
+                        <label class="flex items-center">
+                            <input type="checkbox" class="purpose-filter mr-2" value="practice">
+                            <span class="text-sm text-gray-700">Practice</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" class="purpose-filter mr-2" value="exam">
+                            <span class="text-sm text-gray-700">Exam</span>
+                        </label>
+                    </div>
+                </div>
+                <!-- Organization Filter -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-medium text-gray-700 mb-3">Organization</h4>
+                    <input type="text" id="orgSearch" placeholder="Search organizations..." class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md mb-3" onkeyup="filterOrganizations()">
+                    <div id="orgList" class="space-y-2 max-h-40 overflow-y-auto">
+                        ${organizations.map(org => `
+                            <label class="flex items-center">
+                                <input type="checkbox" class="org-filter mr-2" value="${org.id}">
+                                <span class="text-sm text-gray-700">${org.name}</span>
+                            </label>
+                        `).join('')}
+                    </div>
+                </div>
+                <!-- Course Filter -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-medium text-gray-700 mb-3">Course</h4>
+                    <input type="text" id="courseSearch" placeholder="Search courses..." class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md mb-3" onkeyup="filterCourses()">
+                    <div id="courseList" class="space-y-2 max-h-40 overflow-y-auto">
+                        ${courses.map(course => `
+                            <label class="flex items-center">
+                                <input type="checkbox" class="course-filter mr-2" value="${course.id}">
+                                <span class="text-sm text-gray-700">${course.name}</span>
+                            </label>
+                        `).join('')}
+                    </div>
                 </div>
             </div>
         </div>
@@ -366,6 +372,7 @@ function saveFiltersToURL(page = 1) {
 
 // Apply all filters (now fetches from backend)
 async function applyFilters(page = 1, saveToUrl = true) {
+    console.log("applyFilters")
     // Helper function to get filter values from DOM or URL fallback
     function getFilterValue(domSelector, urlParam, defaultValue = null) {
         const element = document.querySelector(domSelector);
@@ -397,6 +404,9 @@ async function applyFilters(page = 1, saveToUrl = true) {
     const purposeFilters = getCheckboxValues('.purpose-filter:checked', 'purpose');
     const orgFilters = getCheckboxValues('.org-filter:checked', 'org_id');
     const courseFilters = getCheckboxValues('.course-filter:checked', 'course_id');
+
+    console.log(orgFilters)
+    console.log(courseFilters)
 
     // Only save filter state to URL if this is a user-triggered change
     if (saveToUrl) {
@@ -431,10 +441,12 @@ async function applyFilters(page = 1, saveToUrl = true) {
     // Reset selection state when filters are applied
     allRunsSelected = false;
     selectedRunIds.clear();
+
+    console.log(params.toString())
     
     updateRunsDisplay();
     updatePagination();
-        updateRunsCount();
+    updateRunsCount();
         
     } catch (error) {
         console.error('Error applying filters:', error);
@@ -604,7 +616,7 @@ function clearAllFilters() {
     
     // Clear URL and apply filters
     window.history.pushState({}, '', window.location.pathname);
-    applyFilters(1, true); // Don't update sidebar when clearing filters
+    applyFilters(1, true);
 }
 
 // Filter organizations based on search
@@ -1091,7 +1103,7 @@ function addEllipsis(container) {
 function goToPage(pageNum) {
     if (pageNum >= 1 && pageNum <= totalPages && pageNum !== currentPage) {
         currentPage = pageNum;
-        applyFilters(pageNum, true); // Don't update sidebar when paginating
+        applyFilters(pageNum, true);
     }
 }
 

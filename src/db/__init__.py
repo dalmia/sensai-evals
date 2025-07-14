@@ -315,7 +315,7 @@ async def create_run(
         return cursor.lastrowid
 
 
-async def bulk_insert_runs(runs: list[dict]):
+async def bulk_insert_runs(runs: list[tuple]):
     """
     Bulk insert runs into the database.
     """
@@ -327,16 +327,7 @@ async def bulk_insert_runs(runs: list[dict]):
             (run_id, start_time, end_time, messages, metadata)
             VALUES (?, ?, ?, ?, ?)
             """,
-            [
-                (
-                    run["run_id"],
-                    run["start_time"],
-                    run["end_time"],
-                    json.dumps(run["messages"]),
-                    json.dumps(run["metadata"]),
-                )
-                for run in runs
-            ],
+            runs,
         )
         await conn.commit()
 
@@ -958,3 +949,11 @@ async def create_user(name: str):
         )
         await conn.commit()
         return cursor.lastrowid
+
+
+async def get_last_run_time():
+    async with get_new_db_connection() as conn:
+        cursor = await conn.cursor()
+        await cursor.execute(f"SELECT MAX(start_time) FROM {runs_table_name}")
+        row = await cursor.fetchone()
+        return row[0]

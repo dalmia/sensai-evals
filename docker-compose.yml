@@ -1,7 +1,7 @@
 services:
-  sensai-evals:
+  evals:
     image: adalmia/sensai-evals:latest
-    container_name: sensai-evals
+    container_name: evals
     ports:
       - "5001:5001"
     environment:
@@ -15,3 +15,10 @@ services:
       start_period: 40s
     volumes:
       - /appdata_prod:/appdata
+  cron:
+    image: adalmia/sensai-evals:latest
+    container_name: evals-data-sync-cron
+    restart: unless-stopped
+    volumes:
+      - /appdata_prod:/appdata
+    command: sh -c "echo '0 8 * * * cd /app && python -m src.cron' | crontab - && cron -f"

@@ -213,11 +213,17 @@ async def get_runs_api(request: Request):
 
 
 @app.get("/api/queues")
-async def get_queues_api():
+async def get_queues_api(request: Request):
     """API endpoint to get all queues"""
+    # Check authentication
+    auth_redirect = require_auth(request)
+    if auth_redirect:
+        return JSONResponse({"error": "Authentication required"}, status_code=401)
+
     try:
         queues_data = await get_all_queues()
-        return JSONResponse({"queues": queues_data})
+        current_user = get_current_user(request)
+        return JSONResponse({"queues": queues_data, "user": current_user})
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 

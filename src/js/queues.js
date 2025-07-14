@@ -1,5 +1,5 @@
 let queuesData = [];
-let currentUser = '';
+let selectedAnnotator = ''; // Track which annotator's annotations to display
 
 // Pagination variables for queue details
 let currentPage = 1;
@@ -70,7 +70,7 @@ async function loadQueuesData(selectedQueueId = '') {
         }
         
         queuesData = data.queues || [];
-        currentUser = data.user || '';
+        selectedAnnotator = data.user || ''; // Initialize selectedAnnotator to current user
         
         // Update the UI
         updateQueuesList();
@@ -299,7 +299,7 @@ function getAnnotationStatus(run) {
     }
     
     // Only check annotations from the currently selected annotator
-    const annotation_data = run.annotations[currentUser];
+    const annotation_data = run.annotations[selectedAnnotator];
     if (annotation_data && annotation_data.judgement) {
         const judgement = annotation_data.judgement;
         if (judgement === 'correct' || judgement === 'wrong') {
@@ -801,7 +801,7 @@ function initializeQueuesData(data) {
         queuesData = data;
     } else {
         queuesData = data.queues || [];
-        currentUser = data.user || '';
+        selectedAnnotator = data.user || ''; // Initialize selectedAnnotator to current user
         selectedQueueId = data.selectedQueueId || '';
         selectedRunId = data.selectedRunId || '';
     }
@@ -843,7 +843,7 @@ function toggleAnnotatorFilter() {
 }
 
 function filterByAnnotator(annotator) {
-    currentUser = annotator;
+    selectedAnnotator = annotator;
     document.getElementById('currentAnnotator').textContent = annotator;
     document.getElementById('annotatorFilterDropdown').classList.add('hidden');
     

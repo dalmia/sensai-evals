@@ -581,7 +581,6 @@ function selectRun(runIndex) {
             messagesHtml += '<div class="mb-6">' +
                 '<div class="bg-blue-500 text-white p-4 rounded-lg w-full">' +
                 '<div class="text-sm font-medium mb-2">User</div>' +
-                '<div class="text-sm font-medium mb-2">Student\'s Response:</div>' +
                 '<div class="whitespace-pre-wrap">' + content + '</div>' +
                 '</div>' +
                 '</div>';

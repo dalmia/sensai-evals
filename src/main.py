@@ -163,6 +163,8 @@ async def get_runs_api(request: Request):
         question_input_type = params.get("question_input_type")
         page = int(params.get("page", 1))
         page_size = int(params.get("page_size", 20))
+        sort_by = params.get("sort_by", "timestamp")
+        sort_order = params.get("sort_order", "desc")
 
         # Get current user ID for annotation filtering
         annotation_filter_user_id = None
@@ -187,7 +189,7 @@ async def get_runs_api(request: Request):
         org_ids = [int(id) for id in org_ids] if org_ids else None
         course_ids = [int(id) for id in course_ids] if course_ids else None
 
-        # Call fetch_all_runs with all filters and pagination
+        # Call fetch_all_runs with all filters, pagination, and sorting
         runs_data, total_count = await fetch_all_runs(
             annotation_filter=annotation_filter,
             time_range=time_range,
@@ -200,6 +202,8 @@ async def get_runs_api(request: Request):
             page=page,
             page_size=page_size,
             annotation_filter_user_id=annotation_filter_user_id,
+            sort_by=sort_by,
+            sort_order=sort_order,
         )
         total_pages = (total_count + page_size - 1) // page_size
         return JSONResponse(

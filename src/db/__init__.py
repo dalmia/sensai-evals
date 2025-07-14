@@ -744,6 +744,8 @@ async def fetch_all_runs(
     question_input_type: list = None,
     page: int = 1,
     page_size: int = 20,
+    sort_by: str = "timestamp",
+    sort_order: str = "desc",
 ):
     """
     Fetch runs from the database with their annotations, filtered by query parameters and paginated.
@@ -785,11 +787,22 @@ async def fetch_all_runs(
         total_count = await cursor.fetchone()
         total_count = total_count[0] if total_count else 0
 
-        # Add ORDER, LIMIT, OFFSET for pagination
+        # Build ORDER BY clause based on sort parameters
+        order_by_clause = ""
+        if sort_by == "timestamp":
+            # Use start_time for timestamp sorting
+            sort_column = "r.start_time"
+        else:
+            # Default to timestamp if unknown sort field
+            sort_column = "r.start_time"
+
+        # Ensure sort_order is either ASC or DESC
+        sort_direction = "ASC" if sort_order.lower() == "asc" else "DESC"
+        order_by_clause = f" ORDER BY {sort_column} {sort_direction}"
+
+        # Add LIMIT, OFFSET for pagination
         offset = (page - 1) * page_size
-        query = (
-            base_query + where_clause + f" ORDER BY r.created_at DESC LIMIT ? OFFSET ?"
-        )
+        query = base_query + where_clause + order_by_clause + f" LIMIT ? OFFSET ?"
         page_params = params + [page_size, offset]
 
         # Execute query with parameters

@@ -417,6 +417,8 @@ async function applyFilters(page = 1, saveToUrl = true) {
     const params = new URLSearchParams();
     params.append('page', page);
     params.append('page_size', pageSize);
+    params.append('sort_by', currentSort.by);
+    params.append('sort_order', currentSort.order);
     if (annotationFilter && annotationFilter !== 'all') params.append('annotation_filter', annotationFilter);
     if (timeRangeFilter && timeRangeFilter !== 'all') params.append('time_range', timeRangeFilter);
     if (typeFilters.length > 0) params.append('run_type', typeFilters.join(','));
@@ -651,30 +653,11 @@ function filterCourses() {
     });
 }
 
-// Sorting function
-function sortRuns(runs, sortBy, sortOrder) {
-    return runs.slice().sort(function(a, b) {
-        let aValue, bValue;
-        
-        if (sortBy === 'timestamp') {
-            // Parse ISO timestamp format: "2025-07-08T13:03:11.683944+00:00"
-            aValue = new Date(a.start_time);
-            bValue = new Date(b.start_time);
-        }
-        
-        if (sortOrder === 'asc') {
-            return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-        } else {
-            return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-        }
-    });
-}
-
 // Generate runs HTML
-function generateRunsHTML(sortedRuns, startIndex) {
+function generateRunsHTML(runs, startIndex) {
     let runsHtml = '';
-    for (let i = 0; i < sortedRuns.length; i++) {
-        const run = sortedRuns[i];
+    for (let i = 0; i < runs.length; i++) {
+        const run = runs[i];
         const metadata = run.metadata || {};
         
         // Extract relevant metadata keys (excluding "type")
@@ -833,11 +816,10 @@ function generateRunsHTML(sortedRuns, startIndex) {
 
 // Update runs display
 function updateRunsDisplay() {
-    const sortedRuns = sortRuns(runsData, currentSort.by, currentSort.order);
-    
+    // Data is already sorted server-side, no need to sort again
     const runsListElement = document.getElementById('runsList');
     if (runsListElement) {
-        runsListElement.innerHTML = generateRunsHTML(sortedRuns, 0);
+        runsListElement.innerHTML = generateRunsHTML(runsData, 0);
         
         // Restore selection state for current page
         const rowCheckboxes = document.querySelectorAll('.row-checkbox');
@@ -873,9 +855,9 @@ function updateArrow() {
 function toggleTimestampSort() {
     currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc';
     currentPage = 1; // Reset to first page when sorting changes
-    updateRunsDisplay();
     updateArrow();
-    updatePagination();
+    // Trigger new API call with updated sort order
+    applyFilters(1, true);
 }
 
 // Initialize on page load
@@ -933,11 +915,8 @@ function toggleSelectAll() {
 function selectAllRuns() {
     allRunsSelected = true;
     
-    // Add all filtered run IDs to selected set
-    const sortedRuns = sortRuns(filteredRuns, currentSort.by, currentSort.order);
-    sortedRuns.forEach((run, index) => {
-        selectedRunIds.add(index.toString());
-    });
+    // Since we're selecting all runs, we don't need to add individual IDs
+    // The backend will handle the selection based on current filters
     
     // Check all checkboxes on current page
     const rowCheckboxes = document.querySelectorAll('.row-checkbox');

@@ -898,7 +898,7 @@ function toggleSelectAll() {
             selectedCountElement.innerHTML = `
                 <span class="text-sm text-gray-500">${rowCheckboxes.length} selected on this page</span>
                 <button onclick="selectAllRuns()" class="ml-2 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">
-                    Select All ${filteredRuns.length} Runs
+                    Select All ${totalCount} Runs
                 </button>
             `;
             selectedCountElement.classList.remove('hidden');
@@ -952,7 +952,7 @@ function selectAllRuns() {
     
     // Update count display
     const selectedCountElement = document.getElementById('selectedCount');
-    selectedCountElement.textContent = `${filteredRuns.length} selected`;
+    selectedCountElement.textContent = `${totalCount} selected`;
     selectedCountElement.classList.remove('hidden');
 }
 
@@ -997,7 +997,7 @@ function updateSelectedCount() {
     
     // Update count display
     if (allRunsSelected) {
-        selectedCountElement.textContent = `${filteredRuns.length} selected`;
+        selectedCountElement.textContent = `${totalCount} selected`;
         selectedCountElement.classList.remove('hidden');
     } else if (selectedCount > 0) {
         selectedCountElement.textContent = selectedCount + ' selected';
@@ -1122,7 +1122,13 @@ function nextPage() {
 // Function to handle create annotation queue button click
 function createAnnotationQueue() {
     // Check if any rows are selected
-    const selectedCount = selectedRunIds.size;
+    let selectedCount;
+    
+    if (allRunsSelected) {
+        selectedCount = totalCount;
+    } else {
+        selectedCount = selectedRunIds.size;
+    }
     
     if (selectedCount === 0) {
         // Show toast notification that no rows are selected
@@ -1241,8 +1247,38 @@ async function submitCreateQueue() {
     createButton.disabled = true;
     
     try {
-        // Convert selectedRunIds Set to Array of integers
-        const runIds = Array.from(selectedRunIds).map(id => parseInt(id));
+        let requestBody;
+        
+        if (allRunsSelected) {
+            // When all runs are selected, send the current filter parameters instead of specific run IDs
+            // This allows the backend to get all filtered runs
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            requestBody = {
+                name: queueName,
+                description: `Queue created from ${totalCount} selected runs`,
+                select_all_filtered: true,
+                filters: {
+                    annotation_filter: urlParams.get('annotation_filter'),
+                    time_range: urlParams.get('time_range'),
+                    run_type: urlParams.get('run_type'),
+                    question_type: urlParams.get('question_type'),
+                    question_input_type: urlParams.get('question_input_type'),
+                    purpose: urlParams.get('purpose'),
+                    org_id: urlParams.get('org_id'),
+                    course_id: urlParams.get('course_id')
+                }
+            };
+        } else {
+            // Convert selectedRunIds Set to Array of integers
+            const runIds = Array.from(selectedRunIds).map(id => parseInt(id));
+            
+            requestBody = {
+                name: queueName,
+                description: `Queue created from ${runIds.length} selected runs`,
+                run_ids: runIds
+            };
+        }
         
         // Call the API to create the queue
         const response = await fetch('/api/queues', {
@@ -1250,11 +1286,7 @@ async function submitCreateQueue() {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                name: queueName,
-                description: `Queue created from ${runIds.length} selected runs`,
-                run_ids: runIds
-            })
+            body: JSON.stringify(requestBody)
         });
         
         const result = await response.json();
@@ -1281,10 +1313,10 @@ async function submitCreateQueue() {
         
         // Close modal
         closeCreateQueueModal();
-        
+
         // Redirect to the new queue page
-        if (result.queue && result.queue.id) {
-            window.location.href = `/queues/${result.queue.id}`;
+        if (result.queue_id != null) {
+            window.location.href = `/queues/${result.queue_id}`;
         }
         
     } catch (error) {

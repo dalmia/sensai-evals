@@ -398,12 +398,12 @@ async function applyFilters(page = 1, saveToUrl = true) {
     // Gather filter values (from DOM if available, otherwise from URL)
     const annotationFilter = getFilterValue('input[name="annotation"]:checked', 'annotation_filter', 'all');
     const timeRangeFilter = getFilterValue('input[name="timerange"]:checked', 'time_range', 'all');
-    const typeFilters = getCheckboxValues('.type-filter:checked', 'run_type');
-    const questionTypeFilters = getCheckboxValues('.question-type-filter:checked', 'question_type');
-    const inputTypeFilters = getCheckboxValues('.input-type-filter:checked', 'question_input_type');
-    const purposeFilters = getCheckboxValues('.purpose-filter:checked', 'purpose');
-    const orgFilters = getCheckboxValues('.org-filter:checked', 'org_id');
-    const courseFilters = getCheckboxValues('.course-filter:checked', 'course_id');
+    const typeFilters = getCheckboxValues('.type-filter', 'run_type');
+    const questionTypeFilters = getCheckboxValues('.question-type-filter', 'question_type');
+    const inputTypeFilters = getCheckboxValues('.input-type-filter', 'question_input_type');
+    const purposeFilters = getCheckboxValues('.purpose-filter', 'purpose');
+    const orgFilters = getCheckboxValues('.org-filter', 'org_id');
+    const courseFilters = getCheckboxValues('.course-filter', 'course_id');
 
     console.log(orgFilters)
     console.log(courseFilters)

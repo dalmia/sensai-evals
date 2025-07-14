@@ -7,6 +7,58 @@ let pageSize = 20;
 let totalPages = 1;
 let currentQueueRuns = [];
 
+// Function to scroll to a specific queue element
+function scrollToQueue(queueId) {
+    if (!queueId) return;
+    
+    // Wait for DOM to be updated, then scroll
+    setTimeout(() => {
+        // Find the queue element by its onclick attribute
+        const queueElements = document.querySelectorAll('[onclick*="showQueueDetails"]');
+        let targetElement = null;
+        
+        // Find the element that calls showQueueDetails with the specific queueId
+        queueElements.forEach(element => {
+            const onclickAttr = element.getAttribute('onclick');
+            if (onclickAttr && onclickAttr.includes(`showQueueDetails('${queueId}')`)) {
+                targetElement = element;
+            }
+        });
+        
+        if (targetElement) {
+            // Get the scrollable container (the queues list)
+            const queuesListContainer = document.getElementById('queuesList');
+            if (queuesListContainer) {
+                // Calculate the position to scroll to
+                const containerRect = queuesListContainer.getBoundingClientRect();
+                const elementRect = targetElement.getBoundingClientRect();
+                
+                // Calculate the scroll position to center the element in the container
+                const scrollTop = queuesListContainer.scrollTop + 
+                    (elementRect.top - containerRect.top) - 
+                    (containerRect.height / 2) + 
+                    (elementRect.height / 2);
+                
+                // Scroll smoothly to the target element
+                queuesListContainer.scrollTo({
+                    top: Math.max(0, scrollTop),
+                    behavior: 'smooth'
+                });
+                
+                // Optional: Add a brief highlight effect
+                targetElement.style.transition = 'background-color 0.3s ease';
+                targetElement.style.backgroundColor = '#dbeafe'; // Light blue highlight
+                setTimeout(() => {
+                    targetElement.style.backgroundColor = '';
+                    setTimeout(() => {
+                        targetElement.style.transition = '';
+                    }, 300);
+                }, 1000);
+            }
+        }
+    }, 100); // Small delay to ensure DOM is updated
+}
+
 // Load queues data from API
 async function loadQueuesData(selectedQueueId = '') {    
     try {
@@ -33,6 +85,8 @@ async function loadQueuesData(selectedQueueId = '') {
                 
                 setTimeout(() => {
                     showQueueDetails(selectedQueueId, queuePage);
+                    // Scroll to the selected queue
+                    scrollToQueue(selectedQueueId);
                 })
             }
         }
@@ -582,7 +636,7 @@ async function loadQueueRuns(queueId, queueBasicInfo, page = 1) {
                             <span class="text-sm text-gray-500">Created by ${queueBasicInfo.user_name}</span>
                         </div>
                         <div class="flex items-center space-x-2">
-                            <!-- Filter Dropdown -->
+                            <!-- Filter Dropdown 
                             <div class="relative">
                                 <button onclick="toggleAnnotationFilter()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium border border-gray-300 flex items-center space-x-2">
                                     <span id="currentFilter-${queueId}">All</span>
@@ -598,7 +652,7 @@ async function loadQueueRuns(queueId, queueBasicInfo, page = 1) {
                                         <button onclick="filterByAnnotation('wrong')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Wrong</button>
                                     </div>
                                 </div>
-                            </div>
+                            </div> -->
                             <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium" onclick="window.location.href='/queues/${queueId}'">
                                 Start annotation
                             </button>
@@ -767,12 +821,16 @@ function initializeQueuesData(data) {
         const queue = queuesData.find(q => q.id === urlQueueId);
         if (queue) {
             showQueueDetails(urlQueueId, queuePage);
+            // Scroll to the selected queue
+            scrollToQueue(urlQueueId);
             // Run selection will be handled by loadQueueRuns function
         }
     } else if (selectedQueueId && queuesData.length > 0) {
         const queue = queuesData.find(q => q.id === selectedQueueId);
         if (queue) {
             showQueueDetails(selectedQueueId, 1);
+            // Scroll to the selected queue
+            scrollToQueue(selectedQueueId);
             // Run selection will be handled by loadQueueRuns function
         }
     }

@@ -41,6 +41,7 @@ jobs:
           script: |            
             # Navigate to app directory
             cd sensai-evals && sudo docker compose -f docker-compose.yml pull && sudo docker compose -f docker-compose.yml up -d
+            cd sensai-evals && git pull && sudo docker compose -f docker-compose.yml pull && sudo docker compose -f docker-compose.yml up -d
 
       - name: Verify deployment
         run: |

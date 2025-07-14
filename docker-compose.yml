@@ -19,6 +19,9 @@ services:
     image: adalmia/sensai-evals:latest
     container_name: evals-data-sync-cron
     restart: unless-stopped
+    environment:
+      - S3_LLM_TRACES_KEY=${S3_LLM_TRACES_KEY}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
     volumes:
       - /appdata_prod:/appdata
     command: sh -c "echo '0 8 * * * cd /app && python -m src.cron' | crontab - && cron -f"

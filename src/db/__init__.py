@@ -264,6 +264,7 @@ async def get_queue(queue_id: int, page: int = 1, page_size: int = 20):
     async with get_new_db_connection() as conn:
         cursor = await conn.cursor()
 
+        # Get queue details
         queue_details = await cursor.execute(
             f"""
             SELECT q.id, q.name, q.user_id, u.name as user_name, q.created_at FROM {queues_table_name} q
@@ -282,8 +283,23 @@ async def get_queue(queue_id: int, page: int = 1, page_size: int = 20):
             "created_at": queue_details[4],
         }
 
+        # Get total count of runs in this queue
+        await cursor.execute(
+            f"""
+            SELECT COUNT(DISTINCT r.id)
+            FROM {queues_table_name} q
+            LEFT JOIN {queue_runs_table_name} qr ON q.id = qr.queue_id
+            LEFT JOIN {runs_table_name} r ON qr.run_id = r.id
+            WHERE q.id = ?
+            """,
+            (queue_id,),
+        )
+        total_count = (await cursor.fetchone())[0]
+
+        # Calculate offset for pagination
         offset = (page - 1) * page_size
 
+        # Get paginated runs with annotations
         await cursor.execute(
             f"""
                 SELECT r.id as run_id, r.run_id as span_id, r.start_time, r.end_time, r.messages, r.metadata, r.created_at as run_created_at, a.judgement, a.notes, a.created_at as annotation_timestamp, ann_user.name as annotation_username
@@ -338,7 +354,7 @@ async def get_queue(queue_id: int, page: int = 1, page_size: int = 20):
 
         queue["runs"] = runs
 
-        return queue
+        return queue, total_count
 
 
 async def create_queue(

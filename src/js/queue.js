@@ -6,12 +6,24 @@ let selectedAnnotator = '';
 let currentRunIndex = null; // Track currently selected run
 let navigatingFromSidebar = false; // Track if navigation is from within a sidebar
 
-// Load queue data from API
-async function loadQueueData(queueId, user, selectedRunId = '') {
+// Pagination variables
+let currentPage = 1;
+let pageSize = 20;
+let totalPages = 1;
+let totalCount = 0;
+
+// Load queue data from API with pagination support
+async function loadQueueData(queueId, user, selectedRunId = '', page = 1) {
     selectedAnnotator = user; // Set default annotator to logged-in user
     
     try {
-        const response = await fetch(`/api/queues/${queueId}`);
+        // Build URL with pagination parameters
+        const params = new URLSearchParams({
+            page: page,
+            page_size: pageSize
+        });
+        
+        const response = await fetch(`/api/queues/${queueId}?${params.toString()}`);
         const data = await response.json();
         
         if (data.error) {
@@ -20,10 +32,14 @@ async function loadQueueData(queueId, user, selectedRunId = '') {
         
         queueData = data.queue || {};
         runsData = queueData.runs || [];
+        totalCount = data.total_count || 0;
+        totalPages = data.total_pages || 1;
+        currentPage = data.current_page || 1;
         
         // Update the UI
         updateQueueHeader();
         updateRunsDisplay();
+        updatePagination();
         
         // Check if there's a runId in URL to restore
         const urlParams = new URLSearchParams(window.location.search);
@@ -68,7 +84,7 @@ async function loadQueueData(queueId, user, selectedRunId = '') {
                         <div class="text-red-500 text-xl mb-4">⚠️</div>
                         <h3 class="text-lg font-medium text-red-600 mb-2">Error loading queue</h3>
                         <p class="text-sm text-gray-600 mb-4">${error.message}</p>
-                        <button onclick="loadQueueData(${queueId}, '${user}', '${selectedRunId}')" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                        <button onclick="loadQueueData(${queueId}, '${user}', '${selectedRunId}', ${page})" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
                             Retry
                         </button>
                     </div>
@@ -90,7 +106,7 @@ function updateQueueHeader() {
     const queueCreator = document.getElementById('queueCreator');
     
     if (queueHeader && queueData.name) {
-        queueHeader.textContent = `${queueData.name} (${runsData.length})`;
+        queueHeader.textContent = `${queueData.name} (${totalCount})`;
     }
     
     if (queueCreator && queueData.user_name) {
@@ -271,18 +287,10 @@ function getFilteredAndSortedRuns() {
     return sortedRuns;
 }
 
-// Function to update the runs display and queue count
+// Function to update the runs display
 function updateRunsDisplay() {
     const displayRuns = getFilteredAndSortedRuns();
     document.getElementById('runsList').innerHTML = generateRunsHTML(displayRuns);
-    
-    // Update queue count in header
-    const queueHeader = document.querySelector('h2');
-    const queueName = queueHeader.textContent.split(' (')[0];
-    const countText = displayRuns.length !== runsData.length ? 
-        displayRuns.length + ' of ' + runsData.length : 
-        displayRuns.length;
-    queueHeader.textContent = queueName + ' (' + countText + ')';
     
     // Restore run selection if one was selected from URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -825,6 +833,62 @@ function showTab(tabId, buttonElement) {
     // Add active state to clicked button
     buttonElement.classList.remove('text-gray-500');
     buttonElement.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+}
+
+// Pagination functions
+function updatePagination() {
+    const currentPageDisplay = document.getElementById('currentPageDisplay');
+    const totalPagesDisplay = document.getElementById('totalPagesDisplay');
+    const prevPageBtn = document.getElementById('prevPageBtn');
+    const nextPageBtn = document.getElementById('nextPageBtn');
+    
+    if (!currentPageDisplay || !totalPagesDisplay || !prevPageBtn || !nextPageBtn) {
+        return;
+    }
+    
+    // Update page display
+    currentPageDisplay.textContent = currentPage;
+    totalPagesDisplay.textContent = totalPages;
+    
+    // Update navigation buttons
+    prevPageBtn.disabled = currentPage === 1;
+    nextPageBtn.disabled = currentPage === totalPages || totalPages === 0;
+}
+
+function goToPage(pageNum) {
+    if (pageNum >= 1 && pageNum <= totalPages && pageNum !== currentPage) {
+        // Update URL with page parameter
+        const url = new URL(window.location);
+        if (pageNum > 1) {
+            url.searchParams.set('page', pageNum);
+        } else {
+            url.searchParams.delete('page');
+        }
+        window.history.pushState({}, '', url);
+        
+        currentPage = pageNum;
+        
+        // Get current queue ID from URL
+        const pathParts = window.location.pathname.split('/');
+        const queueId = pathParts[pathParts.length - 1];
+        
+        // Get current user from the global variable
+        const currentUser = selectedAnnotator;
+        
+        loadQueueData(queueId, currentUser, '', pageNum);
+    }
+}
+
+function previousPage() {
+    if (currentPage > 1) {
+        goToPage(currentPage - 1);
+    }
+}
+
+function nextPage() {
+    if (currentPage < totalPages) {
+        goToPage(currentPage + 1);
+    }
 }
 
 // Initialize with sorted and filtered runs

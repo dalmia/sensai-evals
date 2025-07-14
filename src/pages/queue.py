@@ -18,6 +18,7 @@ def individual_queue_page(request, queue_id):
 
     # Get runId from query parameters for state restoration
     run_id_param = request.query_params.get("runId", "")
+    page_param = int(request.query_params.get("page", 1))
 
     # Import the JavaScript for individual queue functionality
     queue_script = ScriptX("js/queue.js")
@@ -108,8 +109,23 @@ def individual_queue_page(request, queue_id):
                         </div>
                     </div>
                     
+                    <!-- Pagination -->
+                    <div class="bg-gray-50 border-b border-gray-200 px-4 py-2">
+                        <div class="flex items-center justify-between">
+                            <button id="prevPageBtn" onclick="previousPage()" class="px-3 py-1 text-xs font-medium text-gray-500 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                Previous
+                            </button>
+                            <div class="text-xs text-gray-600">
+                                Page <span id="currentPageDisplay">1</span> / <span id="totalPagesDisplay">1</span>
+                            </div>
+                            <button id="nextPageBtn" onclick="nextPage()" class="px-3 py-1 text-xs font-medium text-gray-500 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                    
                     <!-- Queue Runs List -->
-                    <div id="runsList" class="overflow-y-auto" style="height: calc(100vh - 280px);">
+                    <div id="runsList" class="overflow-y-auto" style="height: calc(100vh - 340px);">
                         <!-- Loading Spinner -->
                         <div id="loadingSpinner" class="flex items-center justify-center py-12">
                             <div class="flex items-center space-x-2">
@@ -143,7 +159,7 @@ def individual_queue_page(request, queue_id):
         <script>
             // Load data from API when page loads
             window.addEventListener('DOMContentLoaded', function() {{
-                loadQueueData({queue_id}, '{run_id_param}');
+                loadQueueData({queue_id}, '{user}', '{run_id_param}', {page_param});
             }});
         </script>
     </body>

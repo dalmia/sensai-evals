@@ -223,11 +223,26 @@ async def get_queues_api():
 
 
 @app.get("/api/queues/{queue_id}")
-async def get_queue_api(queue_id: str):
-    """API endpoint to get a specific queue"""
+async def get_queue_api(queue_id: str, request: Request):
+    """API endpoint to get a specific queue with pagination support"""
     try:
-        queue_data = await get_queue(int(queue_id))
-        return JSONResponse({"queue": queue_data})
+        # Get pagination parameters from query string
+        params = request.query_params
+        page = int(params.get("page", 1))
+        page_size = int(params.get("page_size", 20))
+
+        queue_data, total_count = await get_queue(int(queue_id), page, page_size)
+        total_pages = (total_count + page_size - 1) // page_size
+
+        return JSONResponse(
+            {
+                "queue": queue_data,
+                "total_count": total_count,
+                "total_pages": total_pages,
+                "current_page": page,
+                "page_size": page_size,
+            }
+        )
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 

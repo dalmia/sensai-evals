@@ -4,6 +4,7 @@ import json
 import asyncio
 import os
 from db import get_last_run_time, bulk_insert_runs
+from utils import delete_file_from_s3
 
 load_dotenv()
 
@@ -45,6 +46,8 @@ async def add_new_runs_from_s3():
     await bulk_insert_runs(new_runs)
 
     print(f"Added {len(new_runs)} new runs")
+
+    delete_file_from_s3(os.getenv("S3_LLM_TRACES_KEY"))
 
 
 if __name__ == "__main__":

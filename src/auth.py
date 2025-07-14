@@ -1,20 +1,8 @@
+import json
 from starlette.responses import RedirectResponse
 
 # Valid credentials
-VALID_USERS = {
-    "Aman": {
-        "id": 19,
-        "password": "admin",
-    },
-    "Piyush": {
-        "id": 20,
-        "password": "admin",
-    },
-    "Gayathri": {
-        "id": 21,
-        "password": "admin",
-    },
-}
+VALID_USERS = json.load(open("users.json"))
 
 
 def get_current_user(request):

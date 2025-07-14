@@ -3,6 +3,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import RedirectResponse
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+import json
 
 # Import modularized components
 from auth import VALID_USERS, get_current_user, require_auth
@@ -333,3 +334,26 @@ async def create_annotation_api(request: Request):
 
 
 serve()
+
+
+@app.post("/api/users")
+async def create_user_api(request: Request):
+    """API endpoint to create a new user"""
+    try:
+        body = await request.json()
+        name = body.get("name")
+        if not name:
+            return JSONResponse({"error": "Name is required"}, status_code=400)
+
+        from db import create_user
+
+        user_id = await create_user(name)
+
+        users = json.load(open("users.json"))
+        users[name] = {"id": user_id, "password": "admin"}
+        json.dump(users, open("users.json", "w"))
+
+        return JSONResponse({"success": True, "user_id": user_id})
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)

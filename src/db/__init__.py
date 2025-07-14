@@ -826,3 +826,16 @@ async def get_unique_orgs_and_courses():
         ]
 
         return {"orgs": orgs, "courses": courses}
+
+
+async def create_user(name: str):
+    """
+    Create a new user in the database.
+    """
+    async with get_new_db_connection() as conn:
+        cursor = await conn.cursor()
+        await cursor.execute(
+            f"INSERT INTO {users_table_name} (name) VALUES (?)", (name,)
+        )
+        await conn.commit()
+        return cursor.lastrowid

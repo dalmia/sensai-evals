@@ -43,8 +43,8 @@ jobs:
             export S3_BUCKET_NAME="${{ secrets.S3_BUCKET_NAME }}"
             cd sensai-evals
             git pull
-            sudo docker compose -f docker-compose.yml pull
-            sudo docker compose -f docker-compose.yml up -d
+            sudo -E docker compose -f docker-compose.yml pull
+            sudo -E docker compose -f docker-compose.yml up -d
 
       - name: Verify deployment
         run: |

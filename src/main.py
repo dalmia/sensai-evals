@@ -279,6 +279,8 @@ async def create_queue_api(request: Request):
         name = body.get("name")
         description = body.get("description", "")
         run_ids = body.get("run_ids", [])
+        select_all_filtered = body.get("select_all_filtered", False)
+        filters = body.get("filters", {})
 
         if not name:
             return JSONResponse({"error": "Queue name is required"}, status_code=400)
@@ -287,10 +289,59 @@ async def create_queue_api(request: Request):
         user = get_current_user(request)
         user_id = VALID_USERS[user]["id"]
 
-        # Create the queue
-        new_queue = await create_queue(name, description, user_id, run_ids)
+        # If select_all_filtered is True, pass filters to create_queue
+        if select_all_filtered:
+            # Parse the filters
+            annotation_filter = filters.get("annotation_filter")
+            time_range = filters.get("time_range")
+            org_id = filters.get("org_id")
+            course_id = filters.get("course_id")
+            run_type = filters.get("run_type")
+            purpose = filters.get("purpose")
+            question_type = filters.get("question_type")
+            question_input_type = filters.get("question_input_type")
 
-        return JSONResponse({"success": True, "queue": new_queue})
+            # Get current user ID for annotation filtering
+            annotation_filter_user_id = None
+            if annotation_filter:
+                annotation_filter_user_id = user_id
+
+            # Support multiple values for comma-separated filters
+            def parse_multi(val):
+                if val is None:
+                    return None
+                return [v.strip() for v in val.split(",") if v.strip()]
+
+            run_type = parse_multi(run_type)
+            purpose = parse_multi(purpose)
+            question_type = parse_multi(question_type)
+            question_input_type = parse_multi(question_input_type)
+            org_ids = parse_multi(org_id)
+            course_ids = parse_multi(course_id)
+
+            org_ids = [int(id) for id in org_ids] if org_ids else None
+            course_ids = [int(id) for id in course_ids] if course_ids else None
+
+            # Create the queue with filters
+            new_queue = await create_queue(
+                name=name,
+                description=description,
+                user_id=user_id,
+                annotation_filter=annotation_filter,
+                annotation_filter_user_id=annotation_filter_user_id,
+                time_range=time_range,
+                org_ids=org_ids,
+                course_ids=course_ids,
+                run_type=run_type,
+                purpose=purpose,
+                question_type=question_type,
+                question_input_type=question_input_type,
+            )
+        else:
+            # Create the queue with specific run IDs
+            new_queue = await create_queue(name, description, user_id, run_ids)
+
+        return JSONResponse({"success": True, "queue_id": new_queue})
 
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)

@@ -13,7 +13,7 @@ from .config import (
 from contextlib import asynccontextmanager
 import aiosqlite
 import traceback
-from typing import Optional, List
+from typing import Optional, List, Tuple
 import asyncio
 import functools
 
@@ -47,6 +47,115 @@ def log_exceptions(func):
         return async_wrapper
     else:
         return wrapper
+
+
+def build_run_filters(
+    annotation_filter: str = None,
+    annotation_filter_user_id: int = None,
+    time_range: str = None,
+    org_ids: list = None,
+    course_ids: list = None,
+    run_type: list = None,
+    purpose: list = None,
+    question_type: list = None,
+    question_input_type: list = None,
+    initial_params: list = None,
+) -> Tuple[List[str], List]:
+    """
+    Build WHERE conditions and parameters for filtering runs.
+
+    Args:
+        annotation_filter: Filter by annotation status
+        annotation_filter_user_id: User ID for annotation filtering
+        time_range: Time range filter
+        org_ids: List of organization IDs
+        course_ids: List of course IDs
+        run_type: List of run types
+        purpose: List of purposes
+        question_type: List of question types
+        question_input_type: List of input types
+        initial_params: Initial parameters list to start with
+
+    Returns:
+        Tuple of (where_conditions, params)
+    """
+    where_conditions = []
+    params = initial_params or []
+
+    # Time range filter
+    if time_range:
+        if time_range == "today":
+            where_conditions.append("DATE(r.start_time) = DATE('now')")
+        elif time_range == "yesterday":
+            where_conditions.append("DATE(r.start_time) = DATE('now', '-1 day')")
+        elif time_range == "last7" or time_range == "last_7_days":
+            where_conditions.append("r.start_time >= DATE('now', '-7 days')")
+        elif time_range == "last30" or time_range == "last_30_days":
+            where_conditions.append("r.start_time >= DATE('now', '-30 days')")
+
+    # Annotation filter - user-specific when annotation_filter_user_id is provided
+    if annotation_filter:
+        if annotation_filter_user_id:
+            # Filter annotations for specific user only
+            if (
+                annotation_filter == "annotated"
+                or annotation_filter == "has_annotations"
+            ):
+                where_conditions.append("a.id IS NOT NULL AND a.user_id = ?")
+                params.append(annotation_filter_user_id)
+            elif (
+                annotation_filter == "unannotated"
+                or annotation_filter == "no_annotations"
+            ):
+                where_conditions.append(
+                    f"""r.id NOT IN (
+                    SELECT DISTINCT run_id FROM {annotations_table_name} 
+                    WHERE user_id = ?
+                )"""
+                )
+                params.append(annotation_filter_user_id)
+            elif annotation_filter == "correct":
+                where_conditions.append("a.judgement = 'correct' AND a.user_id = ?")
+                params.append(annotation_filter_user_id)
+            elif annotation_filter == "wrong":
+                where_conditions.append("a.judgement = 'wrong' AND a.user_id = ?")
+                params.append(annotation_filter_user_id)
+        else:
+            # Original logic for any user annotations
+            if (
+                annotation_filter == "annotated"
+                or annotation_filter == "has_annotations"
+            ):
+                where_conditions.append("a.id IS NOT NULL")
+            elif (
+                annotation_filter == "unannotated"
+                or annotation_filter == "no_annotations"
+            ):
+                where_conditions.append("a.id IS NULL")
+            elif annotation_filter == "correct":
+                where_conditions.append("a.judgement = 'correct'")
+            elif annotation_filter == "wrong":
+                where_conditions.append("a.judgement = 'wrong'")
+
+    # Metadata filters (support multiple values)
+    def add_multi_filter(field, values, json_path):
+        if values:
+            placeholders = ",".join(["?"] * len(values))
+            where_conditions.append(
+                f"JSON_EXTRACT(r.metadata, '{json_path}') IN ({placeholders})"
+            )
+            params.extend(values)
+
+    add_multi_filter("org_id", org_ids, "$.org.id")
+    add_multi_filter("course_id", course_ids, "$.course.id")
+    add_multi_filter("run_type", run_type, "$.type")
+    add_multi_filter("purpose", purpose, "$.question_purpose")
+    add_multi_filter("question_type", question_type, "$.question_type")
+    add_multi_filter(
+        "question_input_type", question_input_type, "$.question_input_type"
+    )
+
+    return where_conditions, params
 
 
 @asynccontextmanager
@@ -357,8 +466,22 @@ async def get_queue(queue_id: int, page: int = 1, page_size: int = 20):
         return queue, total_count
 
 
+@log_exceptions
 async def create_queue(
-    name: str, description: str, user_id: int, runs: Optional[List[int]] = None
+    name: str,
+    description: str,
+    user_id: int,
+    runs: Optional[List[int]] = None,
+    # Filter parameters for selecting all filtered runs
+    annotation_filter: str = None,
+    annotation_filter_user_id: int = None,
+    time_range: str = None,
+    org_ids: list = None,
+    course_ids: list = None,
+    run_type: list = None,
+    purpose: list = None,
+    question_type: list = None,
+    question_input_type: list = None,
 ):
     """
     Create a new queue for a user.
@@ -367,13 +490,26 @@ async def create_queue(
         name: Name of the queue
         description: Description of the queue
         user_id: ID of the user who owns the queue
+        runs: Optional list of specific run IDs to include
+
+        # Filter parameters - if provided, will select all runs matching these filters
+        annotation_filter: Filter by annotation status
+        annotation_filter_user_id: User ID for annotation filtering
+        time_range: Time range filter
+        org_ids: List of organization IDs
+        course_ids: List of course IDs
+        run_type: List of run types
+        purpose: List of purposes
+        question_type: List of question types
+        question_input_type: List of input types
 
     Returns:
-        The ID of the created queue
+        The created queue data
     """
     async with get_new_db_connection() as conn:
         cursor = await conn.cursor()
 
+        # Create the queue first
         await cursor.execute(
             f"""
             INSERT INTO {queues_table_name} (name, description, user_id)
@@ -384,7 +520,9 @@ async def create_queue(
 
         queue_id = cursor.lastrowid
 
+        # Add runs to the queue
         if runs:
+            # Use specific run IDs
             values = [(queue_id, run_id) for run_id in runs]
             await cursor.executemany(
                 f"""
@@ -393,9 +531,54 @@ async def create_queue(
                 """,
                 values,
             )
+        elif any(
+            [
+                annotation_filter,
+                time_range,
+                org_ids,
+                course_ids,
+                run_type,
+                purpose,
+                question_type,
+                question_input_type,
+            ]
+        ):
+            # Use filters to select runs directly in the database
+            base_query = f"""
+                INSERT INTO {queue_runs_table_name} (queue_id, run_id)
+                SELECT ?, r.id
+                FROM {runs_table_name} r
+                LEFT JOIN {annotations_table_name} a ON r.id = a.run_id
+                LEFT JOIN {users_table_name} u ON a.user_id = u.id
+            """
+
+            # Build WHERE clause based on filters (same logic as fetch_all_runs)
+            where_conditions, params = build_run_filters(
+                annotation_filter=annotation_filter,
+                annotation_filter_user_id=annotation_filter_user_id,
+                time_range=time_range,
+                org_ids=org_ids,
+                course_ids=course_ids,
+                run_type=run_type,
+                purpose=purpose,
+                question_type=question_type,
+                question_input_type=question_input_type,
+                initial_params=[queue_id],  # Start with queue_id for the INSERT SELECT
+            )
+
+            # Add WHERE clause if there are conditions
+            where_clause = ""
+            if where_conditions:
+                where_clause = " WHERE " + " AND ".join(where_conditions)
+
+            # Execute the INSERT SELECT query
+            query = (
+                base_query + where_clause + " GROUP BY r.id"
+            )  # GROUP BY to avoid duplicates from JOINs
+            await cursor.execute(query, params)
 
         await conn.commit()
-        return await get_queue(queue_id)
+        return queue_id
 
 
 async def bulk_insert_queues(values: list[tuple]):
@@ -589,80 +772,16 @@ async def fetch_all_runs(
         count_query = f"SELECT COUNT(DISTINCT r.id) FROM {runs_table_name} r LEFT JOIN {annotations_table_name} a ON r.id = a.run_id LEFT JOIN {users_table_name} u ON a.user_id = u.id"
 
         # Build WHERE clause based on filters
-        where_conditions = []
-        params = []
-
-        # Time range filter
-        if time_range:
-            if time_range == "today":
-                where_conditions.append("DATE(r.start_time) = DATE('now')")
-            elif time_range == "yesterday":
-                where_conditions.append("DATE(r.start_time) = DATE('now', '-1 day')")
-            elif time_range == "last7" or time_range == "last_7_days":
-                where_conditions.append("r.start_time >= DATE('now', '-7 days')")
-            elif time_range == "last30" or time_range == "last_30_days":
-                where_conditions.append("r.start_time >= DATE('now', '-30 days')")
-
-        # Annotation filter - now user-specific when annotation_filter_user_id is provided
-        if annotation_filter:
-            if annotation_filter_user_id:
-                # Filter annotations for specific user only
-                if (
-                    annotation_filter == "annotated"
-                    or annotation_filter == "has_annotations"
-                ):
-                    where_conditions.append("a.id IS NOT NULL AND a.user_id = ?")
-                    params.append(annotation_filter_user_id)
-                elif (
-                    annotation_filter == "unannotated"
-                    or annotation_filter == "no_annotations"
-                ):
-                    where_conditions.append(
-                        f"""r.id NOT IN (
-                        SELECT DISTINCT run_id FROM {annotations_table_name} 
-                        WHERE user_id = ?
-                    )"""
-                    )
-                    params.append(annotation_filter_user_id)
-                elif annotation_filter == "correct":
-                    where_conditions.append("a.judgement = 'correct' AND a.user_id = ?")
-                    params.append(annotation_filter_user_id)
-                elif annotation_filter == "wrong":
-                    where_conditions.append("a.judgement = 'wrong' AND a.user_id = ?")
-                    params.append(annotation_filter_user_id)
-            else:
-                # Original logic for any user annotations
-                if (
-                    annotation_filter == "annotated"
-                    or annotation_filter == "has_annotations"
-                ):
-                    where_conditions.append("a.id IS NOT NULL")
-                elif (
-                    annotation_filter == "unannotated"
-                    or annotation_filter == "no_annotations"
-                ):
-                    where_conditions.append("a.id IS NULL")
-                elif annotation_filter == "correct":
-                    where_conditions.append("a.judgement = 'correct'")
-                elif annotation_filter == "wrong":
-                    where_conditions.append("a.judgement = 'wrong'")
-
-        # Metadata filters (support multiple values)
-        def add_multi_filter(field, values, json_path):
-            if values:
-                placeholders = ",".join(["?"] * len(values))
-                where_conditions.append(
-                    f"JSON_EXTRACT(r.metadata, '{json_path}') IN ({placeholders})"
-                )
-                params.extend(values)
-
-        add_multi_filter("org_id", org_ids, "$.org.id")
-        add_multi_filter("course_id", course_ids, "$.course.id")
-        add_multi_filter("run_type", run_type, "$.type")
-        add_multi_filter("purpose", purpose, "$.question_purpose")
-        add_multi_filter("question_type", question_type, "$.question_type")
-        add_multi_filter(
-            "question_input_type", question_input_type, "$.question_input_type"
+        where_conditions, params = build_run_filters(
+            annotation_filter=annotation_filter,
+            annotation_filter_user_id=annotation_filter_user_id,
+            time_range=time_range,
+            org_ids=org_ids,
+            course_ids=course_ids,
+            run_type=run_type,
+            purpose=purpose,
+            question_type=question_type,
+            question_input_type=question_input_type,
         )
 
         # Add WHERE clause if there are conditions

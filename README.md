@@ -18,7 +18,7 @@ pip install -r requirements.txt
 - Run the server
 
 ```bash
-python src/main.py
+cd src && python main.py
 ```
 
 The app will be available at `http://localhost:5001`

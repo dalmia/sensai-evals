@@ -1,8 +1,9 @@
 import json
 from starlette.responses import RedirectResponse
+from db.config import users_json_path
 
 # Valid credentials
-VALID_USERS = json.load(open("users.json"))
+VALID_USERS = json.load(open(users_json_path))
 
 
 def get_current_user(request):

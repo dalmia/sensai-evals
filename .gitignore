@@ -5,4 +5,4 @@ __pycache__
 notebooks
 **.sqlite*
 coverage.xml
-src/users.json
+src/db/users.json

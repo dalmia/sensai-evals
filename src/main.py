@@ -18,6 +18,7 @@ from db import (
     create_queue,
     get_unique_orgs_and_courses,
 )
+from db.config import users_json_path
 import json
 import os
 
@@ -349,9 +350,9 @@ async def create_user_api(request: Request):
 
         user_id = await create_user(name)
 
-        users = json.load(open("users.json"))
+        users = json.load(open(users_json_path))
         users[name] = {"id": user_id, "password": "admin"}
-        json.dump(users, open("users.json", "w"))
+        json.dump(users, open(users_json_path, "w"))
 
         return JSONResponse({"success": True, "user_id": user_id})
 

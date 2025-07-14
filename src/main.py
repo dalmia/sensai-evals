@@ -87,7 +87,7 @@ def login_page(request):
     </head>
     <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
         <div class="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full">
-            <h1 class="text-2xl font-bold text-gray-800 mb-8 text-center">Authentication Required</h1>
+            <h1 class="text-2xl font-bold text-gray-800 mb-8 text-center">SensAI evals</h1>
             <form method="post" action="/login">
                 <div class="mb-6">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>

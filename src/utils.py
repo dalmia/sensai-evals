@@ -18,13 +18,3 @@ def download_file_from_s3_as_bytes(key: str):
 
     response = s3_client.get_object(Bucket=bucket_name, Key=key)
     return response["Body"].read()
-
-
-def delete_file_from_s3(key: str):
-    """
-    Delete a file from S3 bucket
-    """
-    bucket_name = os.getenv("S3_BUCKET_NAME")
-    session = boto3.Session()
-    s3_client = session.client("s3")
-    s3_client.delete_object(Bucket=bucket_name, Key=key)

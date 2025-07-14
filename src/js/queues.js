@@ -18,6 +18,7 @@ async function loadQueuesData(selectedQueueId = '') {
         }
         
         queuesData = data.queues || [];
+        currentUser = data.user || '';
         
         // Update the UI
         updateQueuesList();
@@ -26,8 +27,12 @@ async function loadQueuesData(selectedQueueId = '') {
         if (selectedQueueId && queuesData.length > 0) {
             const queue = queuesData.find(q => q.id === Number(selectedQueueId));
             if (queue) {
+                // Get queue page from URL if present
+                const urlParams = new URLSearchParams(window.location.search);
+                const queuePage = parseInt(urlParams.get('queuePage')) || 1;
+                
                 setTimeout(() => {
-                    showQueueDetails(selectedQueueId);
+                    showQueueDetails(selectedQueueId, queuePage);
                 })
             }
         }
@@ -47,7 +52,7 @@ async function loadQueuesData(selectedQueueId = '') {
                         <div class="text-red-500 text-xl mb-4">⚠️</div>
                         <p class="text-red-600 text-lg">Error loading queues</p>
                         <p class="text-gray-600">${error.message}</p>
-                        <button onclick="loadQueuesData('${user}', '${selectedQueueId}', '${selectedRunId}')" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                        <button onclick="loadQueuesData('${selectedQueueId}')" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
                             Retry
                         </button>
                     </div>
@@ -84,7 +89,7 @@ function updateQueuesList() {
         const formattedTimestamp = formatTimestamp(queue.created_at);
         return createQueueItem(
             queue.name,
-            queue.runs ? queue.runs.length : 0,
+            queue.num_runs || 0,  // Use num_runs instead of queue.runs.length
             formattedTimestamp,
             queue.user_name,
             queue.id
@@ -251,10 +256,15 @@ function getAnnotationStatus(run) {
     return null; // No valid annotation found
 }
 
-function showQueueDetails(queueId) {
+function showQueueDetails(queueId, page = 1) {
     // Update URL with queue ID as query parameter
     const url = new URL(window.location);
     url.searchParams.set('queueId', queueId);
+    if (page > 1) {
+        url.searchParams.set('queuePage', page);
+    } else {
+        url.searchParams.delete('queuePage');
+    }
     window.history.pushState({}, '', url);
     
     // Add visual selection state to queue items
@@ -272,406 +282,454 @@ function showQueueDetails(queueId) {
 
     if (!queue) return;
     
-    // Get runs directly from queue.runs
-    const runs = queue.runs || [];
-    currentQueueRuns = runs;
-    totalPages = Math.ceil(runs.length / pageSize);
-    currentPage = 1;
+    // Reset pagination variables
+    currentPage = page;
+    totalPages = 1;
+    currentQueueRuns = [];
+    
+    // Load queue runs data from API with pagination
+    loadQueueRuns(queueId, queue, page);
+}
 
-    // Generate runs HTML with sorting functionality
-    function generateRunsHTML(sortedRuns, startIndex) {
-        let runsHtml = '';
-        for (let i = 0; i < sortedRuns.length; i++) {
-            const run = sortedRuns[i];
-            const annotation = getAnnotationStatus(run);
-            const runName = getRunName(run);
-            const timestamp = formatTimestamp(run.start_time);
-            const tagBadges = createTagBadges(run.metadata || {});
-            
-            // Annotation icon
-            let annotationIcon = '';
-            if (annotation === 'correct') {
-                annotationIcon = `<div class="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                  <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>`;
-            } else if (annotation === 'wrong') {
-                annotationIcon = `<div class="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
-                  <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </div>`;
-            } else {
-                annotationIcon = '<div class="w-5 h-5 rounded-full border-2 border-gray-300 bg-white flex-shrink-0"></div>';
-            }
-            
-            runsHtml += `
-                <div class="border-b border-l-4 border-l-transparent border-gray-100 px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors" onclick="selectRun('${queueId}', '${run.id}')">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-3 flex-1">
-                            ${annotationIcon}
-                            <div class="flex-1">
-                                <div class="text-sm font-medium text-gray-900">${runName}</div>
-                                <div class="flex items-center space-x-2 mt-1">
-                                    ${tagBadges}
+// New function to load queue runs with pagination
+async function loadQueueRuns(queueId, queueBasicInfo, page = 1) {
+    try {
+        // Build URL with pagination parameters
+        const params = new URLSearchParams({
+            page: page,
+            page_size: pageSize
+        });
+        
+        const response = await fetch(`/api/queues/${queueId}?${params.toString()}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Update pagination variables
+        currentQueueRuns = data.queue.runs || [];
+        totalPages = data.total_pages || 1;
+        currentPage = data.current_page || 1;
+        const totalCount = data.total_count || 0;
+        
+        // Generate runs HTML with sorting functionality
+        function generateRunsHTML(sortedRuns, startIndex) {
+            let runsHtml = '';
+            for (let i = 0; i < sortedRuns.length; i++) {
+                const run = sortedRuns[i];
+                const annotation = getAnnotationStatus(run);
+                const runName = getRunName(run);
+                const timestamp = formatTimestamp(run.start_time);
+                const tagBadges = createTagBadges(run.metadata || {});
+                
+                // Annotation icon
+                let annotationIcon = '';
+                if (annotation === 'correct') {
+                    annotationIcon = `<div class="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                      <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>`;
+                } else if (annotation === 'wrong') {
+                    annotationIcon = `<div class="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
+                      <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </div>`;
+                } else {
+                    annotationIcon = '<div class="w-5 h-5 rounded-full border-2 border-gray-300 bg-white flex-shrink-0"></div>';
+                }
+                
+                runsHtml += `
+                    <div class="border-b border-l-4 border-l-transparent border-gray-100 px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors" onclick="selectRun('${queueId}', '${run.id}')">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3 flex-1">
+                                ${annotationIcon}
+                                <div class="flex-1">
+                                    <div class="text-sm font-medium text-gray-900">${runName}</div>
+                                    <div class="flex items-center space-x-2 mt-1">
+                                        ${tagBadges}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div class="flex items-center space-x-4">
-                            <div class="text-sm text-gray-600">
-                                ${timestamp}
+                            <div class="flex items-center space-x-4">
+                                <div class="text-sm text-gray-600">
+                                    ${timestamp}
+                                </div>
+                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
                             </div>
-                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                            </svg>
+                        </div>
+                    </div>
+                `;
+            }
+            return runsHtml;
+        }
+        
+        // Sorting functions
+        function sortRuns(runs, sortBy, sortOrder) {
+            return [...runs].sort((a, b) => {
+                let aValue, bValue;
+                
+                if (sortBy === 'timestamp') {
+                    aValue = new Date(a.start_time);
+                    bValue = new Date(b.start_time);
+                } else if (sortBy === 'name') {
+                    aValue = getRunName(a).toLowerCase();
+                    bValue = getRunName(b).toLowerCase();
+                }
+                
+                if (sortOrder === 'asc') {
+                    return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+                } else {
+                    return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+                }
+            });
+        }
+        
+        // Initial sort by timestamp descending
+        let currentSort = { by: 'timestamp', order: 'desc' };
+        let sortedRuns = sortRuns(currentQueueRuns, currentSort.by, currentSort.order);
+        let currentFilter = 'all';
+        
+        // Function to filter runs by annotation status
+        function filterRuns(runs, filter) {
+            if (filter === 'all') return runs;
+            if (filter === 'empty') return runs.filter(run => getAnnotationStatus(run) === null);
+            if (filter === 'correct') return runs.filter(run => getAnnotationStatus(run) === 'correct');
+            if (filter === 'wrong') return runs.filter(run => getAnnotationStatus(run) === 'wrong');
+            return runs;
+        }
+        
+        // Function to get filtered and sorted runs
+        function getFilteredAndSortedRuns() {
+            let filteredRuns = filterRuns(currentQueueRuns, currentFilter);
+            return sortRuns(filteredRuns, currentSort.by, currentSort.order);
+        }
+        
+        // Function to update the runs display with pagination
+        function updateRunsDisplay() {
+            const allFilteredRuns = getFilteredAndSortedRuns();
+            
+            document.getElementById(`runsList-${queueId}`).innerHTML = generateRunsHTML(allFilteredRuns, 0);
+            
+            // Update queue count in header
+            const queueHeader = document.querySelector('h2');
+            queueHeader.textContent = `${queueBasicInfo.name} (${totalCount})`;
+            
+            // Update pagination
+            updatePagination();
+            
+            // Restore run selection if one was selected
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlRunId = urlParams.get('runId');
+            if (urlRunId) {
+                setTimeout(() => {
+                    const runElement = document.querySelector(`[onclick="selectRun('${queueId}', '${urlRunId}')"]`);
+                    if (runElement) {
+                        runElement.classList.add('bg-blue-50', 'border-l-blue-500');
+                        runElement.classList.remove('border-l-transparent');
+                    }
+                }, 10);
+            }
+        }
+        
+        // Function to get arrow based on current sort
+        function getTimestampArrow(currentOrder) {
+            if (currentOrder === 'asc') {
+                return `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                </svg>`;
+            } else {
+                return `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>`;
+            }
+        }
+        
+        function updateHeader() {
+            const arrow = getTimestampArrow(currentSort.order);
+            document.getElementById(`timestampHeader-${queueId}`).innerHTML = `
+                <button onclick="toggleTimestampSort()" class="flex items-center text-gray-700 hover:text-gray-900 p-1 rounded transition-colors">
+                    <span class="text-sm font-medium">Timestamp</span>
+                    <div class="ml-1">
+                        ${arrow}
+                    </div>
+                </button>
+            `;
+        }
+        
+        // Pagination functions - updated to work with API calls
+        function updatePagination() {
+            const paginationInfo = document.getElementById(`paginationInfo-${queueId}`);
+            const totalRunsCount = document.getElementById(`totalRunsCount-${queueId}`);
+            const prevPageBtn = document.getElementById(`prevPageBtn-${queueId}`);
+            const nextPageBtn = document.getElementById(`nextPageBtn-${queueId}`);
+            const pageNumbers = document.getElementById(`pageNumbers-${queueId}`);
+            
+            if (!paginationInfo || !totalRunsCount || !prevPageBtn || !nextPageBtn || !pageNumbers) {
+                return;
+            }
+            
+            // Update pagination info
+            const startIndex = (currentPage - 1) * pageSize + 1;
+            const endIndex = Math.min(currentPage * pageSize, totalCount);
+            paginationInfo.textContent = `${startIndex}-${endIndex}`;
+            totalRunsCount.textContent = totalCount;
+            
+            // Update navigation buttons
+            prevPageBtn.disabled = currentPage === 1;
+            nextPageBtn.disabled = currentPage === totalPages;
+            
+            // Generate page numbers
+            generatePageNumbers(pageNumbers);
+        }
+        
+        function generatePageNumbers(container) {
+            container.innerHTML = '';
+            
+            if (totalPages <= 1) {
+                return;
+            }
+            
+            const maxVisiblePages = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+            
+            // Adjust start page if we're near the end
+            if (endPage - startPage + 1 < maxVisiblePages) {
+                startPage = Math.max(1, endPage - maxVisiblePages + 1);
+            }
+            
+            // Add first page and ellipsis if needed
+            if (startPage > 1) {
+                addPageButton(container, 1, false);
+                if (startPage > 2) {
+                    addEllipsis(container);
+                }
+            }
+            
+            // Add page numbers
+            for (let i = startPage; i <= endPage; i++) {
+                addPageButton(container, i, i === currentPage);
+            }
+            
+            // Add last page and ellipsis if needed
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    addEllipsis(container);
+                }
+                addPageButton(container, totalPages, false);
+            }
+        }
+        
+        function addPageButton(container, pageNum, isActive) {
+            const button = document.createElement('button');
+            button.textContent = pageNum;
+            button.onclick = () => goToPage(pageNum);
+            button.className = `px-3 py-2 text-sm font-medium rounded-md ${
+                isActive 
+                    ? 'bg-blue-600 text-white' 
+                    : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
+            }`;
+            container.appendChild(button);
+        }
+        
+        function addEllipsis(container) {
+            const span = document.createElement('span');
+            span.textContent = '...';
+            span.className = 'px-3 py-2 text-sm text-gray-500';
+            container.appendChild(span);
+        }
+        
+        function goToPage(pageNum) {
+            if (pageNum >= 1 && pageNum <= totalPages && pageNum !== currentPage) {
+                // Update URL with page parameter
+                const url = new URL(window.location);
+                if (pageNum > 1) {
+                    url.searchParams.set('queuePage', pageNum);
+                } else {
+                    url.searchParams.delete('queuePage');
+                }
+                window.history.pushState({}, '', url);
+                
+                // Load new page data from API
+                loadQueueRuns(queueId, queueBasicInfo, pageNum);
+            }
+        }
+        
+        function previousPage() {
+            if (currentPage > 1) {
+                goToPage(currentPage - 1);
+            }
+        }
+        
+        function nextPage() {
+            if (currentPage < totalPages) {
+                goToPage(currentPage + 1);
+            }
+        }
+        
+        const content = `
+            <div class="flex flex-col h-full">
+                <!-- Header -->
+                <div class="bg-white border-b border-t border-gray-200 px-6 py-4">
+                    <div class="flex justify-between items-center">
+                        <div class="flex flex-col">
+                            <h2 class="text-lg font-semibold text-gray-900">${queueBasicInfo.name} (${totalCount})</h2>
+                            <span class="text-sm text-gray-500">Created by ${queueBasicInfo.user_name}</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <!-- Filter Dropdown -->
+                            <div class="relative">
+                                <button onclick="toggleAnnotationFilter()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium border border-gray-300 flex items-center space-x-2">
+                                    <span id="currentFilter-${queueId}">All</span>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+                                <div id="annotationFilterDropdown-${queueId}" class="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-10 hidden">
+                                    <div class="py-1">
+                                        <button onclick="filterByAnnotation('all')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">All</button>
+                                        <button onclick="filterByAnnotation('empty')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Not annotated</button>
+                                        <button onclick="filterByAnnotation('correct')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Correct</button>
+                                        <button onclick="filterByAnnotation('wrong')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Wrong</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium" onclick="window.location.href='/queues/${queueId}'">
+                                Start annotation
+                            </button>
                         </div>
                     </div>
                 </div>
-            `;
-        }
-        return runsHtml;
-    }
-    
-    // Sorting functions
-    function sortRuns(runs, sortBy, sortOrder) {
-        return [...runs].sort((a, b) => {
-            let aValue, bValue;
-            
-            if (sortBy === 'timestamp') {
-                aValue = new Date(a.start_time);
-                bValue = new Date(b.start_time);
-            } else if (sortBy === 'name') {
-                aValue = getRunName(a).toLowerCase();
-                bValue = getRunName(b).toLowerCase();
-            }
-            
-            if (sortOrder === 'asc') {
-                return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-            } else {
-                return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
-            }
-        });
-    }
-    
-    // Initial sort by timestamp descending
-    let currentSort = { by: 'timestamp', order: 'desc' };
-    let sortedRuns = sortRuns(runs, currentSort.by, currentSort.order);
-    let currentFilter = 'all';
-    
-    // Function to filter runs by annotation status
-    function filterRuns(runs, filter) {
-        if (filter === 'all') return runs;
-        if (filter === 'empty') return runs.filter(run => getAnnotationStatus(run) === null);
-        if (filter === 'correct') return runs.filter(run => getAnnotationStatus(run) === 'correct');
-        if (filter === 'wrong') return runs.filter(run => getAnnotationStatus(run) === 'wrong');
-        return runs;
-    }
-    
-    // Function to get filtered and sorted runs
-    function getFilteredAndSortedRuns() {
-        let filteredRuns = filterRuns(runs, currentFilter);
-        return sortRuns(filteredRuns, currentSort.by, currentSort.order);
-    }
-    
-    // Function to update the runs display with pagination
-    function updateRunsDisplay() {
-        const allFilteredRuns = getFilteredAndSortedRuns();
-        totalPages = Math.ceil(allFilteredRuns.length / pageSize);
+                
+                <!-- Pagination -->
+                <div class="bg-white border-b border-gray-200 px-6 py-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-sm text-gray-700">Showing</span>
+                            <span id="paginationInfo-${queueId}" class="text-sm font-medium text-gray-900">1-${Math.min(pageSize, totalCount)}</span>
+                            <span class="text-sm text-gray-700">of</span>
+                            <span id="totalRunsCount-${queueId}" class="text-sm font-medium text-gray-900">${totalCount}</span>
+                            <span class="text-sm text-gray-700">runs</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button id="prevPageBtn-${queueId}" onclick="previousPage()" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                Previous
+                            </button>
+                            <div id="pageNumbers-${queueId}" class="flex items-center space-x-1">
+                                <!-- Page numbers will be generated here -->
+                            </div>
+                            <button id="nextPageBtn-${queueId}" onclick="nextPage()" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Table Header -->
+                <div class="bg-gray-50 border-b border-gray-200 px-6 py-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                        </div>
+                        <div class="flex items-center ml-4" id="timestampHeader-${queueId}">
+                            <button onclick="toggleTimestampSort()" class="flex items-center text-gray-700 hover:text-gray-900 p-1 rounded transition-colors">
+                                <span class="text-sm font-medium">Timestamp</span>
+                                <div class="ml-1">
+                                    ${getTimestampArrow(currentSort.order)}
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Queue Runs List -->
+                <div class="bg-white flex-1 overflow-y-auto" id="runsList-${queueId}">
+                    ${generateRunsHTML(sortedRuns, 0)}
+                </div>
+            </div>
+        `;
         
-        // Calculate pagination slice
-        const startIndex = (currentPage - 1) * pageSize;
-        const endIndex = startIndex + pageSize;
-        const currentPageRuns = allFilteredRuns.slice(startIndex, endIndex);
+        document.getElementById('mainContent').innerHTML = content;
         
-        document.getElementById(`runsList-${queueId}`).innerHTML = generateRunsHTML(currentPageRuns, startIndex);
-        
-        // Update queue count in header
-        const queueHeader = document.querySelector('h2');
-        queueHeader.textContent = `${queue.name} (${allFilteredRuns.length}${allFilteredRuns.length !== runs.length ? ` of ${runs.length}` : ''})`;
-        
-        // Update pagination
+        // Initialize pagination
         updatePagination();
         
-        // Restore run selection if one was selected
+        // Check if there's a run to restore from URL
         const urlParams = new URLSearchParams(window.location.search);
         const urlRunId = urlParams.get('runId');
         if (urlRunId) {
+            // Wait a bit for the DOM to be updated, then select the run
             setTimeout(() => {
                 const runElement = document.querySelector(`[onclick="selectRun('${queueId}', '${urlRunId}')"]`);
                 if (runElement) {
-                    runElement.classList.add('bg-blue-50', 'border-l-blue-500');
-                    runElement.classList.remove('border-l-transparent');
+                    selectRun(queueId, urlRunId);
                 }
-            }, 10);
+            }, 100);
         }
-    }
-    
-    // Function to get arrow based on current sort
-    function getTimestampArrow(currentOrder) {
-        if (currentOrder === 'asc') {
-            return `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
-            </svg>`;
-        } else {
-            return `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-            </svg>`;
-        }
-    }
-    
-    function updateHeader() {
-        const arrow = getTimestampArrow(currentSort.order);
-        document.getElementById(`timestampHeader-${queueId}`).innerHTML = `
-            <button onclick="toggleTimestampSort()" class="flex items-center text-gray-700 hover:text-gray-900 p-1 rounded transition-colors">
-                <span class="text-sm font-medium">Timestamp</span>
-                <div class="ml-1">
-                    ${arrow}
+        
+        // Add global sorting functions
+        window.toggleTimestampSort = function() {
+            currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc';
+            updateRunsDisplay();
+            updateHeader();
+        };
+        
+        // Add global filter functions
+        window.toggleAnnotationFilter = function() {
+            const dropdown = document.getElementById(`annotationFilterDropdown-${queueId}`);
+            dropdown.classList.toggle('hidden');
+        };
+        
+        window.filterByAnnotation = function(filter) {
+            currentFilter = filter;
+            const filterLabels = {
+                'all': 'All',
+                'empty': 'Not annotated',
+                'correct': 'Correct',
+                'wrong': 'Wrong'
+            };
+            document.getElementById(`currentFilter-${queueId}`).textContent = filterLabels[filter];
+            document.getElementById(`annotationFilterDropdown-${queueId}`).classList.add('hidden');
+            updateRunsDisplay();
+        };
+        
+        // Add global pagination functions
+        window.previousPage = previousPage;
+        window.nextPage = nextPage;
+        
+    } catch (error) {
+        console.error('Error loading queue runs:', error);
+        
+        // Show error in main content
+        document.getElementById('mainContent').innerHTML = `
+            <div class="flex flex-col h-full">
+                <div class="bg-white border-b border-t border-gray-200 px-6 py-4">
+                    <h2 class="text-lg font-semibold text-gray-900">${queueBasicInfo.name}</h2>
+                    <span class="text-sm text-gray-500">Created by ${queueBasicInfo.user_name}</span>
                 </div>
-            </button>
+                <div class="flex-1 flex items-center justify-center">
+                    <div class="text-center">
+                        <div class="text-red-500 text-xl mb-4">⚠️</div>
+                        <p class="text-red-600 text-lg">Error loading runs for queue "${queueBasicInfo.name}"</p>
+                        <p class="text-gray-600">${error.message}</p>
+                        <button onclick="loadQueueRuns('${queueId}', queueBasicInfo, 1)" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            </div>
         `;
     }
-    
-    // Pagination functions
-    function updatePagination() {
-        const paginationInfo = document.getElementById(`paginationInfo-${queueId}`);
-        const totalRunsCount = document.getElementById(`totalRunsCount-${queueId}`);
-        const prevPageBtn = document.getElementById(`prevPageBtn-${queueId}`);
-        const nextPageBtn = document.getElementById(`nextPageBtn-${queueId}`);
-        const pageNumbers = document.getElementById(`pageNumbers-${queueId}`);
-        
-        if (!paginationInfo || !totalRunsCount || !prevPageBtn || !nextPageBtn || !pageNumbers) {
-            return;
-        }
-        
-        const allFilteredRuns = getFilteredAndSortedRuns();
-        
-        // Update pagination info
-        const startIndex = (currentPage - 1) * pageSize + 1;
-        const endIndex = Math.min(currentPage * pageSize, allFilteredRuns.length);
-        paginationInfo.textContent = `${startIndex}-${endIndex}`;
-        totalRunsCount.textContent = allFilteredRuns.length;
-        
-        // Update navigation buttons
-        prevPageBtn.disabled = currentPage === 1;
-        nextPageBtn.disabled = currentPage === totalPages;
-        
-        // Generate page numbers
-        generatePageNumbers(pageNumbers);
-    }
-    
-    function generatePageNumbers(container) {
-        container.innerHTML = '';
-        
-        if (totalPages <= 1) {
-            return;
-        }
-        
-        const maxVisiblePages = 5;
-        let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-        
-        // Adjust start page if we're near the end
-        if (endPage - startPage + 1 < maxVisiblePages) {
-            startPage = Math.max(1, endPage - maxVisiblePages + 1);
-        }
-        
-        // Add first page and ellipsis if needed
-        if (startPage > 1) {
-            addPageButton(container, 1, false);
-            if (startPage > 2) {
-                addEllipsis(container);
-            }
-        }
-        
-        // Add page numbers
-        for (let i = startPage; i <= endPage; i++) {
-            addPageButton(container, i, i === currentPage);
-        }
-        
-        // Add last page and ellipsis if needed
-        if (endPage < totalPages) {
-            if (endPage < totalPages - 1) {
-                addEllipsis(container);
-            }
-            addPageButton(container, totalPages, false);
-        }
-    }
-    
-    function addPageButton(container, pageNum, isActive) {
-        const button = document.createElement('button');
-        button.textContent = pageNum;
-        button.onclick = () => goToPage(pageNum);
-        button.className = `px-3 py-2 text-sm font-medium rounded-md ${
-            isActive 
-                ? 'bg-blue-600 text-white' 
-                : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
-        }`;
-        container.appendChild(button);
-    }
-    
-    function addEllipsis(container) {
-        const span = document.createElement('span');
-        span.textContent = '...';
-        span.className = 'px-3 py-2 text-sm text-gray-500';
-        container.appendChild(span);
-    }
-    
-    function goToPage(pageNum) {
-        if (pageNum >= 1 && pageNum <= totalPages && pageNum !== currentPage) {
-            currentPage = pageNum;
-            updateRunsDisplay();
-        }
-    }
-    
-    function previousPage() {
-        if (currentPage > 1) {
-            goToPage(currentPage - 1);
-        }
-    }
-    
-    function nextPage() {
-        if (currentPage < totalPages) {
-            goToPage(currentPage + 1);
-        }
-    }
-    
-    const content = `
-        <div class="flex flex-col h-full">
-            <!-- Header -->
-            <div class="bg-white border-b border-t border-gray-200 px-6 py-4">
-                <div class="flex justify-between items-center">
-                    <div class="flex flex-col">
-                        <h2 class="text-lg font-semibold text-gray-900">${queue.name} (${runs.length})</h2>
-                        <span class="text-sm text-gray-500">Created by ${queue.user_name}</span>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        <!-- Filter Dropdown -->
-                        <div class="relative">
-                            <button onclick="toggleAnnotationFilter()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium border border-gray-300 flex items-center space-x-2">
-                                <span id="currentFilter-${queueId}">All</span>
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </button>
-                            <div id="annotationFilterDropdown-${queueId}" class="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-10 hidden">
-                                <div class="py-1">
-                                    <button onclick="filterByAnnotation('all')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">All</button>
-                                    <button onclick="filterByAnnotation('empty')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Not annotated</button>
-                                    <button onclick="filterByAnnotation('correct')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Correct</button>
-                                    <button onclick="filterByAnnotation('wrong')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Wrong</button>
-                                </div>
-                            </div>
-                        </div>
-                        <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium" onclick="window.location.href='/queues/${queueId}'">
-                            Start annotation
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Pagination -->
-            <div class="bg-white border-b border-gray-200 px-6 py-4">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-2">
-                        <span class="text-sm text-gray-700">Showing</span>
-                        <span id="paginationInfo-${queueId}" class="text-sm font-medium text-gray-900">1-20</span>
-                        <span class="text-sm text-gray-700">of</span>
-                        <span id="totalRunsCount-${queueId}" class="text-sm font-medium text-gray-900">${runs.length}</span>
-                        <span class="text-sm text-gray-700">runs</span>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        <button id="prevPageBtn-${queueId}" onclick="previousPage()" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
-                            Previous
-                        </button>
-                        <div id="pageNumbers-${queueId}" class="flex items-center space-x-1">
-                            <!-- Page numbers will be generated here -->
-                        </div>
-                        <button id="nextPageBtn-${queueId}" onclick="nextPage()" class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
-                            Next
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Table Header -->
-            <div class="bg-gray-50 border-b border-gray-200 px-6 py-3">
-                <div class="flex items-center justify-between">
-                    <div class="flex-1">
-                    </div>
-                    <div class="flex items-center ml-4" id="timestampHeader-${queueId}">
-                        <button onclick="toggleTimestampSort()" class="flex items-center text-gray-700 hover:text-gray-900 p-1 rounded transition-colors">
-                            <span class="text-sm font-medium">Timestamp</span>
-                            <div class="ml-1">
-                                ${getTimestampArrow(currentSort.order)}
-                            </div>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Queue Runs List -->
-            <div class="bg-white flex-1 overflow-y-auto" id="runsList-${queueId}">
-                ${generateRunsHTML(sortedRuns.slice(0, pageSize), 0)}
-            </div>
-        </div>
-    `;
-    
-    document.getElementById('mainContent').innerHTML = content;
-    
-    // Initialize pagination
-    updatePagination();
-    
-    // Check if there's a run to restore from URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlRunId = urlParams.get('runId');
-    if (urlRunId) {
-        // Wait a bit for the DOM to be updated, then select the run
-        setTimeout(() => {
-            const runElement = document.querySelector(`[onclick="selectRun('${queueId}', '${urlRunId}')"]`);
-            if (runElement) {
-                selectRun(queueId, urlRunId);
-            }
-        }, 100);
-    }
-    
-    // Add global sorting functions
-    window.toggleTimestampSort = function() {
-        currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc';
-        currentPage = 1; // Reset to first page when sorting changes
-        updateRunsDisplay();
-        updateHeader();
-    };
-    
-    // Add global filter functions
-    window.toggleAnnotationFilter = function() {
-        const dropdown = document.getElementById(`annotationFilterDropdown-${queueId}`);
-        dropdown.classList.toggle('hidden');
-    };
-    
-    window.filterByAnnotation = function(filter) {
-        currentFilter = filter;
-        const filterLabels = {
-            'all': 'All',
-            'empty': 'Not annotated',
-            'correct': 'Correct',
-            'wrong': 'Wrong'
-        };
-        document.getElementById(`currentFilter-${queueId}`).textContent = filterLabels[filter];
-        document.getElementById(`annotationFilterDropdown-${queueId}`).classList.add('hidden');
-        currentPage = 1; // Reset to first page when filtering
-        updateRunsDisplay();
-    };
-    
-    // Add global pagination functions
-    window.previousPage = previousPage;
-    window.nextPage = nextPage;
 }
 
 // Function to select a run and navigate to annotation page
 function selectRun(queueId, runId) {
-    // Navigate to the queue annotation page with run ID
-    window.location.href = `/queues/${queueId}?runId=${runId}`;
+    // Navigate to the queue annotation page with run ID and page number
+    window.location.href = `/queues/${queueId}?runId=${runId}&page=${currentPage}`;
 }
 
 function toggleDropdown() {
@@ -703,36 +761,19 @@ function initializeQueuesData(data) {
     const urlParams = new URLSearchParams(window.location.search);
     const urlQueueId = urlParams.get('queueId');
     const urlRunId = urlParams.get('runId');
+    const queuePage = parseInt(urlParams.get('queuePage')) || 1;
     
     if (urlQueueId && queuesData.length > 0) {
         const queue = queuesData.find(q => q.id === urlQueueId);
         if (queue) {
-            showQueueDetails(urlQueueId);
-            // Also restore run selection if runId is present
-            if (urlRunId) {
-                // Wait a bit for the DOM to be updated, then select the run
-                setTimeout(() => {
-                    const runElement = document.querySelector(`[onclick="selectRun('${urlQueueId}', '${urlRunId}')"]`);
-                    if (runElement) {
-                        selectRun(urlQueueId, urlRunId);
-                    }
-                }, 100);
-            }
+            showQueueDetails(urlQueueId, queuePage);
+            // Run selection will be handled by loadQueueRuns function
         }
     } else if (selectedQueueId && queuesData.length > 0) {
         const queue = queuesData.find(q => q.id === selectedQueueId);
         if (queue) {
-            showQueueDetails(selectedQueueId);
-            // Also restore run selection if runId is present
-            if (selectedRunId) {
-                // Wait a bit for the DOM to be updated, then select the run
-                setTimeout(() => {
-                    const runElement = document.querySelector(`[onclick="selectRun('${selectedQueueId}', '${selectedRunId}')"]`);
-                    if (runElement) {
-                        selectRun(selectedQueueId, selectedRunId);
-                    }
-                }, 100);
-            }
+            showQueueDetails(selectedQueueId, 1);
+            // Run selection will be handled by loadQueueRuns function
         }
     }
 }

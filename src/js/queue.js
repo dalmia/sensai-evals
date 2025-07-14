@@ -3,6 +3,7 @@ let runsData = [];
 let currentSort = {'by': 'timestamp', 'order': 'desc'};
 let currentFilter = 'all';
 let selectedAnnotator = '';
+let currentUser = ''; // Add currentUser variable
 let currentRunIndex = null; // Track currently selected run
 let navigatingFromSidebar = false; // Track if navigation is from within a sidebar
 
@@ -12,8 +13,61 @@ let pageSize = 20;
 let totalPages = 1;
 let totalCount = 0;
 
+// Function to scroll to a specific run element
+function scrollToRun(runIndex) {
+    if (runIndex === -1 || !runsData[runIndex]) return;
+    
+    // Wait for DOM to be updated, then scroll
+    setTimeout(() => {
+        // Find the run element by its onclick attribute
+        const runElements = document.querySelectorAll('[onclick*="selectRun"]');
+        let targetElement = null;
+        
+        // Find the element that calls selectRun with the specific runIndex
+        runElements.forEach(element => {
+            const onclickAttr = element.getAttribute('onclick');
+            if (onclickAttr && onclickAttr.includes(`selectRun(${runIndex})`)) {
+                targetElement = element;
+            }
+        });
+        
+        if (targetElement) {
+            // Get the scrollable container (the runs list)
+            const runsListContainer = document.getElementById('runsList');
+            if (runsListContainer) {
+                // Calculate the position to scroll to
+                const containerRect = runsListContainer.getBoundingClientRect();
+                const elementRect = targetElement.getBoundingClientRect();
+                
+                // Calculate the scroll position to center the element in the container
+                const scrollTop = runsListContainer.scrollTop + 
+                    (elementRect.top - containerRect.top) - 
+                    (containerRect.height / 2) + 
+                    (elementRect.height / 2);
+                
+                // Scroll smoothly to the target element
+                runsListContainer.scrollTo({
+                    top: Math.max(0, scrollTop),
+                    behavior: 'smooth'
+                });
+                
+                // Optional: Add a brief highlight effect
+                targetElement.style.transition = 'background-color 0.3s ease';
+                targetElement.style.backgroundColor = '#dbeafe'; // Light blue highlight
+                setTimeout(() => {
+                    targetElement.style.backgroundColor = '';
+                    setTimeout(() => {
+                        targetElement.style.transition = '';
+                    }, 300);
+                }, 1000);
+            }
+        }
+    }, 100); // Small delay to ensure DOM is updated
+}
+
 // Load queue data from API with pagination support
 async function loadQueueData(queueId, user, selectedRunId = '', page = 1) {
+    currentUser = user; // Set current user
     selectedAnnotator = user; // Set default annotator to logged-in user
     
     try {
@@ -50,6 +104,8 @@ async function loadQueueData(queueId, user, selectedRunId = '', page = 1) {
             const runIndex = runsData.findIndex(run => run.id === Number(urlRunId));
             if (runIndex !== -1) {
                 selectRun(runIndex);
+                // Scroll to the run after selection
+                scrollToRun(runIndex);
                 return;
             }
         } else if (selectedRunId && runsData.length > 0) {
@@ -57,6 +113,8 @@ async function loadQueueData(queueId, user, selectedRunId = '', page = 1) {
             const runIndex = runsData.findIndex(run => run.id === selectedRunId);
             if (runIndex !== -1) {
                 selectRun(runIndex);
+                // Scroll to the run after selection
+                scrollToRun(runIndex);
                 return;
             }
         }
@@ -118,6 +176,7 @@ function updateQueueHeader() {
 function initializeQueueData(data) {
     queueData = data.queue;
     runsData = data.runs;
+    currentUser = data.user; // Set current user
     selectedAnnotator = data.user; // Set default annotator to logged-in user
     updateRunsDisplay();
     
@@ -432,6 +491,12 @@ function filterByAnnotator(annotator) {
     document.getElementById('annotatorFilterDropdown').classList.add('hidden');
     // Refresh the display since annotation status depends on selected annotator
     updateRunsDisplay();
+    
+    // If annotation sidebar is open and a run is selected, refresh its content
+    const annotationSidebar = document.getElementById('annotationSidebar');
+    if (annotationSidebar && !annotationSidebar.classList.contains('hidden') && currentRunIndex !== null && runsData[currentRunIndex]) {
+        populateAnnotationContent(runsData[currentRunIndex]);
+    }
 }
 
 // Function to select and display a run

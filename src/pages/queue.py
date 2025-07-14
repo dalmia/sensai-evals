@@ -72,7 +72,7 @@ def individual_queue_page(request, queue_id):
                                     </div>
                                 </div>
                                 
-                                <!-- Status Filter -->
+                                <!-- Status Filter
                                 <div class="relative">
                                     <div class="text-xs text-gray-500 mb-1">Status</div>
                                     <button onclick="toggleAnnotationFilter()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs font-medium border border-gray-300 flex items-center space-x-1">
@@ -89,10 +89,10 @@ def individual_queue_page(request, queue_id):
                                             <button onclick="filterByAnnotation('wrong')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Wrong</button>
                                         </div>
                                     </div>
-                                </div>
+                                </div>  -->
                             </div>
                             
-                            <!-- Timestamp Sorting -->
+                            <!-- Timestamp Sorting
                             <div class="flex items-center" id="timestampHeader">
                                 <div class="relative">
                                     <div class="text-xs text-gray-500 mb-1">Sort by</div>
@@ -105,7 +105,7 @@ def individual_queue_page(request, queue_id):
                                         </div>
                                     </button>
                                 </div>
-                            </div>
+                            </div> -->
                         </div>
                     </div>
                     

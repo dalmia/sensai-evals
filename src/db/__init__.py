@@ -726,26 +726,38 @@ async def fetch_all_runs(
 @log_exceptions
 async def get_all_queues():
     """
-    Get all queues with their associated user information and runs with annotations.
+    Get all queues with their basic information and run count.
 
     Returns:
-        List of dictionaries containing queue data with runs and annotations
+        List of dictionaries containing queue data with num_runs count
     """
     async with get_new_db_connection() as conn:
         cursor = await conn.cursor()
 
+        # Get all queues with their basic info and run count
         await cursor.execute(
             f"""
-            SELECT id FROM {queues_table_name}
+            SELECT q.id, q.name, q.user_id, u.name as user_name, q.created_at,
+                   COUNT(DISTINCT qr.run_id) as num_runs
+            FROM {queues_table_name} q
+            JOIN {users_table_name} u ON q.user_id = u.id
+            LEFT JOIN {queue_runs_table_name} qr ON q.id = qr.queue_id
+            GROUP BY q.id, q.name, q.user_id, u.name, q.created_at
+            ORDER BY q.created_at DESC
             """,
         )
         queue_rows = await cursor.fetchall()
 
         queues = []
-
         for row in queue_rows:
-            queue_id = row[0]
-            queue = await get_queue(queue_id)
+            queue = {
+                "id": row[0],
+                "name": row[1],
+                "user_id": row[2],
+                "user_name": row[3],
+                "created_at": row[4],
+                "num_runs": row[5],
+            }
             queues.append(queue)
 
         return queues

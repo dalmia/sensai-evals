@@ -87,100 +87,178 @@ def create_annotation_sidebar():
             const annotations = run.annotations || {};
             const currentUserAnnotation = annotations[selectedAnnotator] || {};
             
-            // Store original annotation state for comparison
-            originalAnnotationState = {
-                judgement: currentUserAnnotation.judgement || null,
-                notes: currentUserAnnotation.notes || ''
-            };
+            // Check if the selected annotator is the current user
+            const isCurrentUser = selectedAnnotator === currentUser;
+            
+            // Store original annotation state for comparison (only for current user)
+            if (isCurrentUser) {
+                originalAnnotationState = {
+                    judgement: currentUserAnnotation.judgement || null,
+                    notes: currentUserAnnotation.notes || ''
+                };
+            }
             
             // Determine current annotation state
             const hasCorrect = currentUserAnnotation.judgement === 'correct';
             const hasWrong = currentUserAnnotation.judgement === 'wrong';
             const hasNotes = currentUserAnnotation.notes && currentUserAnnotation.notes.trim().length > 0;
+            const hasAnyAnnotation = currentUserAnnotation.judgement || hasNotes;
             
             // Determine navigation button states
             const canGoPrevious = currentRunIndex > 0;
             const canGoNext = currentRunIndex < runsData.length - 1;
             
-            // Generate annotation form HTML matching the exact UI from the image
-            const annotationHtml = `
-                <div class="flex flex-col h-full">
-                    <!-- Judgement Section -->
-                    <div class="mb-6">
-                        <h3 class="text-lg font-medium text-gray-900 mb-4">Judgement</h3>
-                        <div class="flex space-x-4">
-                            <button onclick="selectJudgement('correct')" 
-                                    class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${hasCorrect ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
-                                    id="correctBtn">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            let annotationHtml = '';
+            
+            if (!isCurrentUser && !hasAnyAnnotation) {
+                // Show placeholder for no annotations when viewing another annotator
+                annotationHtml = `
+                    <div class="flex flex-col h-full">
+                        <div class="flex-1 flex items-center justify-center">
+                            <div class="text-center text-gray-500">
+                                <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                                 </svg>
-                                <span>Correct</span>
+                                <h3 class="text-lg font-medium text-gray-900 mb-2">No annotations found</h3>
+                                <p class="text-sm text-gray-500">${selectedAnnotator} has not annotated this run yet</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Navigation Section -->
+                        <div class="flex items-center justify-between mb-4">
+                            <button onclick="goToPrevious()" 
+                                    class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors duration-200 ${canGoPrevious ? 'text-gray-600 bg-gray-100 hover:bg-gray-200' : 'text-gray-400 bg-gray-100 cursor-not-allowed opacity-60'}"
+                                    id="prevAnnotationBtn"
+                                    ${canGoPrevious ? '' : 'disabled'}>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                </svg>
+                                <span>Previous</span>
                             </button>
-                            <button onclick="selectJudgement('wrong')" 
-                                    class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${hasWrong ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
-                                    id="wrongBtn">
+                            
+                            <button onclick="goToNext()" 
+                                    class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors duration-200 ${canGoNext ? 'text-gray-600 bg-gray-100 hover:bg-gray-200' : 'text-gray-400 bg-gray-100 cursor-not-allowed opacity-60'}"
+                                    id="nextAnnotationBtn"
+                                    ${canGoNext ? '' : 'disabled'}>
+                                <span>Next</span>
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                                 </svg>
-                                <span>Wrong</span>
                             </button>
                         </div>
-                    </div>
-                    
-                    <!-- Notes Section -->
-                    <div class="mb-6">
-                        <h3 class="text-lg font-medium text-gray-900 mb-4">Notes</h3>
-                        <textarea id="annotationNotes" 
-                                  rows="6" 
-                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                                  placeholder="Add details about the annotation"
-                                  onchange="updateAnnotationState()"
-                                  oninput="updateAnnotationState()">${currentUserAnnotation.notes || ''}</textarea>
-                    </div>
-                    
-                    <!-- Bottom Update Button -->
-                    <button onclick="updateAnnotation()" 
-                            class="w-full py-3 px-4 rounded-lg font-medium text-white mb-6 transition-colors duration-200 bg-gray-300 cursor-not-allowed"
-                            id="updateAnnotationBtn2"
-                            disabled>
-                        Update annotation
-                    </button>
-                    
-                    <!-- Navigation Section -->
-                    <div class="flex items-center justify-between mb-4">
-                        <button onclick="goToPrevious()" 
-                                class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors duration-200 ${canGoPrevious ? 'text-gray-600 bg-gray-100 hover:bg-gray-200' : 'text-gray-400 bg-gray-100 cursor-not-allowed opacity-60'}"
-                                id="prevAnnotationBtn"
-                                ${canGoPrevious ? '' : 'disabled'}>
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-                            </svg>
-                            <span>Previous</span>
-                        </button>
                         
-                        <button onclick="goToNext()" 
-                                class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors duration-200 ${canGoNext ? 'text-gray-600 bg-gray-100 hover:bg-gray-200' : 'text-gray-400 bg-gray-100 cursor-not-allowed opacity-60'}"
-                                id="nextAnnotationBtn"
-                                ${canGoNext ? '' : 'disabled'}>
-                            <span>Next</span>
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                            </svg>
+                        <!-- Page indicator -->
+                        <div class="text-center text-gray-500 text-sm">
+                            <span id="annotationCounter">${(currentRunIndex + 1)} of ${runsData.length}</span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Generate annotation form HTML
+                const judgementSectionTitle = isCurrentUser ? 'Judgement' : `Judgement (${selectedAnnotator})`;
+                const notesSectionTitle = isCurrentUser ? 'Notes' : `Notes (${selectedAnnotator})`;
+                
+                // Create judgement buttons - disable non-selected ones for view-only mode
+                const correctButtonClass = hasCorrect 
+                    ? 'bg-green-500 text-white' 
+                    : (isCurrentUser ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60');
+                const wrongButtonClass = hasWrong 
+                    ? 'bg-red-500 text-white' 
+                    : (isCurrentUser ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60');
+                
+                const correctButtonAction = isCurrentUser ? `onclick="selectJudgement('correct')"` : 'disabled';
+                const wrongButtonAction = isCurrentUser ? `onclick="selectJudgement('wrong')"` : 'disabled';
+                
+                // Create notes textarea - read-only for view-only mode
+                const notesAttributes = isCurrentUser 
+                    ? 'onchange="updateAnnotationState()" oninput="updateAnnotationState()"'
+                    : 'readonly';
+                const notesClass = isCurrentUser 
+                    ? 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none'
+                    : 'w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 resize-none cursor-not-allowed';
+                
+                annotationHtml = `
+                    <div class="flex flex-col h-full">
+                        <!-- Judgement Section -->
+                        <div class="mb-6">
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">${judgementSectionTitle}</h3>
+                            <div class="flex space-x-4">
+                                <button ${correctButtonAction}
+                                        class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${correctButtonClass}"
+                                        id="correctBtn">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                    <span>Correct</span>
+                                </button>
+                                <button ${wrongButtonAction}
+                                        class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${wrongButtonClass}"
+                                        id="wrongBtn">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                    <span>Wrong</span>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Notes Section -->
+                        <div class="mb-6">
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">${notesSectionTitle}</h3>
+                            <textarea id="annotationNotes" 
+                                      rows="6" 
+                                      class="${notesClass}"
+                                      placeholder="${isCurrentUser ? 'Add details about the annotation' : 'No notes provided'}"
+                                      ${notesAttributes}>${currentUserAnnotation.notes || ''}</textarea>
+                        </div>
+                        
+                        ${isCurrentUser ? `
+                        <!-- Bottom Update Button (only for current user) -->
+                        <button onclick="updateAnnotation()" 
+                                class="w-full py-3 px-4 rounded-lg font-medium text-white mb-6 transition-colors duration-200 bg-gray-300 cursor-not-allowed"
+                                id="updateAnnotationBtn2"
+                                disabled>
+                            Update annotation
                         </button>
+                        ` : ''}
+                        
+                        <!-- Navigation Section -->
+                        <div class="flex items-center justify-between mb-4">
+                            <button onclick="goToPrevious()" 
+                                    class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors duration-200 ${canGoPrevious ? 'text-gray-600 bg-gray-100 hover:bg-gray-200' : 'text-gray-400 bg-gray-100 cursor-not-allowed opacity-60'}"
+                                    id="prevAnnotationBtn"
+                                    ${canGoPrevious ? '' : 'disabled'}>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                </svg>
+                                <span>Previous</span>
+                            </button>
+                            
+                            <button onclick="goToNext()" 
+                                    class="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors duration-200 ${canGoNext ? 'text-gray-600 bg-gray-100 hover:bg-gray-200' : 'text-gray-400 bg-gray-100 cursor-not-allowed opacity-60'}"
+                                    id="nextAnnotationBtn"
+                                    ${canGoNext ? '' : 'disabled'}>
+                                <span>Next</span>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <!-- Page indicator -->
+                        <div class="text-center text-gray-500 text-sm">
+                            <span id="annotationCounter">${(currentRunIndex + 1)} of ${runsData.length}</span>
+                        </div>
                     </div>
-                    
-                    <!-- Page indicator -->
-                    <div class="text-center text-gray-500 text-sm">
-                        <span id="annotationCounter">${(currentRunIndex + 1)} of ${runsData.length}</span>
-                    </div>
-                </div>
-            `;
+                `;
+            }
             
             annotationContent.innerHTML = annotationHtml;
             
-            // Update button state after populating content
-            updateAnnotationState();
+            // Update button state after populating content (only for current user)
+            if (isCurrentUser) {
+                updateAnnotationState();
+            }
         }
         
         // Function to update annotation state (called when notes change)
@@ -247,6 +325,9 @@ def create_annotation_sidebar():
                 navigatingFromSidebar = true;
                 selectRun(currentRunIndex - 1);
                 
+                // Scroll to the newly selected run
+                scrollToRun(currentRunIndex);
+                
                 // If annotation sidebar is open, refresh its content
                 const annotationSidebar = document.getElementById('annotationSidebar');
                 if (annotationSidebar && !annotationSidebar.classList.contains('hidden')) {
@@ -260,6 +341,9 @@ def create_annotation_sidebar():
             if (currentRunIndex < runsData.length - 1) {
                 navigatingFromSidebar = true;
                 selectRun(currentRunIndex + 1);
+                
+                // Scroll to the newly selected run
+                scrollToRun(currentRunIndex);
                 
                 // If annotation sidebar is open, refresh its content
                 const annotationSidebar = document.getElementById('annotationSidebar');

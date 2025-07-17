@@ -1114,7 +1114,7 @@ function nextPage() {
 }
 
 // Function to handle create annotation queue button click
-function createAnnotationQueue() {
+async function createAnnotationQueue() {
     // Check if any rows are selected
     let selectedCount;
     
@@ -1138,8 +1138,42 @@ function createAnnotationQueue() {
         return;
     }
     
-    // Show modal for queue name input
-    showCreateQueueModal(selectedCount);
+    // First, fetch existing queues
+    try {
+        const response = await fetch('/api/queues');
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to fetch queues');
+        }
+        
+        const queues = data.queues || [];
+        
+        // If no queues exist, show the create new queue modal directly
+        if (queues.length === 0) {
+            showCreateQueueModal(selectedCount);
+        } else {
+            // Show queue selection modal with existing queues
+            showQueueSelectionModal(selectedCount, queues);
+        }
+        
+    } catch (error) {
+        console.error('Error fetching queues:', error);
+        
+        // If there's an error fetching queues, fall back to showing create new queue modal
+        showCreateQueueModal(selectedCount);
+        
+        // Optionally show a warning toast
+        Toastify({
+            text: "Could not load existing queues. Creating new queue instead.",
+            duration: 3000,
+            gravity: "top",
+            position: "right",
+            backgroundColor: "#f59e0b",
+            stopOnFocus: true,
+            close: true
+        }).showToast();
+    }
 }
 
 // Function to show the create queue modal
@@ -1340,6 +1374,271 @@ function closeCreateQueueModal() {
         modal.remove();
     }
 } 
+
+// Function to show the queue selection modal with existing queues
+function showQueueSelectionModal(selectedCount, queues) {
+    // Create modal HTML
+    const modalHTML = `
+        <div id="queueSelectionModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-10 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white max-h-[80vh] flex flex-col">
+                <div class="mb-4">
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">Add to Annotation Queue</h3>
+                    <p class="text-sm text-gray-500">
+                        Adding ${selectedCount} selected run${selectedCount > 1 ? 's' : ''} to a queue
+                    </p>
+                </div>
+                
+                <!-- Create New Button -->
+                <div class="mb-4">
+                    <button 
+                        onclick="showCreateQueueModalFromSelection(${selectedCount})" 
+                        class="w-full px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                    >
+                        Create New Queue
+                    </button>
+                </div>
+                
+                <!-- Search Bar -->
+                <div class="mb-4">
+                    <input 
+                        type="text" 
+                        id="queueSearch" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Search queues"
+                        oninput="filterQueueList()"
+                    >
+                </div>
+                
+                <!-- Queue List -->
+                <div class="flex-1 overflow-y-auto mb-4 border border-gray-200 rounded-md">
+                    <div id="queueList" class="divide-y divide-gray-200">
+                        ${queues.map(queue => `
+                            <div class="queue-item p-3 hover:bg-gray-50 cursor-pointer" onclick="selectQueue(${queue.id}, '${queue.name.replace(/'/g, "\\'")}')" data-queue-name="${queue.name.toLowerCase()}">
+                                <div class="text-sm font-medium text-gray-900">${queue.name}</div>
+                                <div class="text-xs text-gray-400 mt-1">${queue.num_runs} runs</div>
+                                <div class="text-xs text-gray-400 mt-1">Created by ${queue.user_name}</div>
+                                <div class="text-xs text-gray-400 mt-1">${new Date(queue.created_at).toLocaleDateString()}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                <!-- Cancel Button -->
+                <div class="mt-4">
+                    <button 
+                        onclick="closeQueueSelectionModal()" 
+                        class="w-full px-4 py-2 bg-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Focus on search input
+    setTimeout(() => {
+        const searchInput = document.getElementById('queueSearch');
+        if (searchInput) {
+            searchInput.focus();
+        }
+    }, 100);
+}
+
+// Function to filter the queue list based on search input
+function filterQueueList() {
+    const searchTerm = document.getElementById('queueSearch').value.toLowerCase();
+    const queueItems = document.querySelectorAll('.queue-item');
+    
+    queueItems.forEach(item => {
+        const queueName = item.getAttribute('data-queue-name');
+        if (queueName.includes(searchTerm)) {
+            item.style.display = 'block';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+// Function to handle queue selection
+function selectQueue(queueId, queueName) {
+    let selectedCount;
+    
+    if (allRunsSelected) {
+        selectedCount = totalCount;
+    } else {
+        selectedCount = selectedRunIds.size;
+    }
+    
+    showConfirmationModal(queueId, queueName, selectedCount);
+}
+
+// Function to show confirmation modal when selecting an existing queue
+function showConfirmationModal(queueId, queueName, selectedCount) {
+    const modalHTML = `
+        <div id="confirmationModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[100]">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                <div class="mt-3">
+                    <div class="mt-2 text-center">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">Confirm Addition</h3>
+                        <div class="mt-2 px-7">
+                            <p class="text-sm text-gray-500">
+                                Are you sure you want to add ${selectedCount} selected run${selectedCount > 1 ? 's' : ''} to the queue: <span class="text-sm font-medium text-gray-900 mt-2">
+                                "${queueName}"
+                            </span>
+                            </p>
+                            
+                        </div>
+                    </div>
+                    <div class="mt-6 flex space-x-3">
+                        <button 
+                            onclick="confirmAddToQueue(${queueId}, '${queueName.replace(/'/g, "\\'")}')" 
+                            class="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                        >
+                            Confirm
+                        </button>
+                        <button 
+                            onclick="closeConfirmationModal()" 
+                            class="flex-1 px-4 py-2 bg-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+// Function to handle confirmed addition to existing queue
+async function confirmAddToQueue(queueId, queueName) {
+    const confirmButton = document.querySelector('button[onclick*="confirmAddToQueue"]');
+    const originalButtonText = confirmButton.innerHTML;
+    confirmButton.innerHTML = `
+        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+    `;
+    confirmButton.disabled = true;
+    
+    try {
+        let requestBody;
+        
+        if (allRunsSelected) {
+            // When all runs are selected, send the current filter parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            requestBody = {
+                select_all_filtered: true,
+                filters: {
+                    annotation_filter: urlParams.get('annotation_filter'),
+                    time_range: urlParams.get('time_range'),
+                    run_type: urlParams.get('run_type'),
+                    question_type: urlParams.get('question_type'),
+                    question_input_type: urlParams.get('question_input_type'),
+                    purpose: urlParams.get('purpose'),
+                    org_id: urlParams.get('org_id'),
+                    course_id: urlParams.get('course_id')
+                }
+            };
+        } else {
+            // Convert selectedRunIds Set to Array of integers
+            const runIds = Array.from(selectedRunIds).map(id => parseInt(id));
+            
+            requestBody = {
+                run_ids: runIds
+            };
+        }
+        
+        // Call the API to add runs to the existing queue
+        const response = await fetch(`/api/queues/${queueId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody)
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to add runs to queue');
+        }
+        
+        // Show success toast
+        Toastify({
+            text: `Runs added to queue "${queueName}" successfully!`,
+            duration: 3000,
+            gravity: "top",
+            position: "right",
+            backgroundColor: "#10b981",
+            stopOnFocus: true,
+            close: true
+        }).showToast();
+        
+        // Clear selection
+        selectedRunIds.clear();
+        allRunsSelected = false;
+        updateSelectedCount();
+        
+        // Close all modals
+        closeConfirmationModal();
+        closeQueueSelectionModal();
+
+        // Redirect to the queue page
+        window.location.href = `/queues/${queueId}`;
+        
+    } catch (error) {
+        console.error('Error adding runs to queue:', error);
+        
+        // Reset button to original state
+        confirmButton.innerHTML = originalButtonText;
+        confirmButton.disabled = false;
+        
+        // Show error toast
+        Toastify({
+            text: `Failed to add runs to queue: ${error.message}`,
+            duration: 5000,
+            gravity: "top",
+            position: "right",
+            backgroundColor: "#ef4444",
+            stopOnFocus: true,
+            close: true
+        }).showToast();
+    }
+}
+
+// Function to show create queue modal from selection modal
+function showCreateQueueModalFromSelection(selectedCount) {
+    // Close the selection modal first
+    closeQueueSelectionModal();
+    // Show the create queue modal
+    showCreateQueueModal(selectedCount);
+}
+
+// Function to close the queue selection modal
+function closeQueueSelectionModal() {
+    const modal = document.getElementById('queueSelectionModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+// Function to close the confirmation modal
+function closeConfirmationModal() {
+    const modal = document.getElementById('confirmationModal');
+    if (modal) {
+        modal.remove();
+    }
+}
 
 // Add this at the end of the file to ensure global scope for the HTML oninput handler
 function validateUserEmail() {

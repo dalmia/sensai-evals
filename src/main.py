@@ -16,6 +16,7 @@ from db import (
     get_all_queues,
     get_queue,
     create_queue,
+    update_queue,
     get_unique_orgs_and_courses,
 )
 from db.config import users_json_path
@@ -364,6 +365,82 @@ async def create_queue_api(request: Request):
             new_queue = await create_queue(name, description, user_id, run_ids)
 
         return JSONResponse({"success": True, "queue_id": new_queue})
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.put("/api/queues/{queue_id}")
+async def add_runs_to_queue_api(queue_id: str, request: Request):
+    """API endpoint to add runs to an existing queue"""
+    # Check authentication
+    auth_redirect = require_auth(request)
+    if auth_redirect:
+        return JSONResponse({"error": "Authentication required"}, status_code=401)
+
+    try:
+        # Parse JSON body
+        body = await request.json()
+        run_ids = body.get("run_ids", [])
+        select_all_filtered = body.get("select_all_filtered", False)
+        filters = body.get("filters", {})
+
+        # Get current user
+        user = get_current_user(request)
+        user_id = VALID_USERS[user]["id"]
+
+        if select_all_filtered:
+            # When all filtered runs are selected, use filters to update the queue
+            annotation_filter = filters.get("annotation_filter")
+            time_range = filters.get("time_range")
+            org_id = filters.get("org_id")
+            course_id = filters.get("course_id")
+            run_type = filters.get("run_type")
+            purpose = filters.get("purpose")
+            question_type = filters.get("question_type")
+            question_input_type = filters.get("question_input_type")
+
+            # Get current user ID for annotation filtering
+            annotation_filter_user_id = None
+            if annotation_filter:
+                annotation_filter_user_id = user_id
+
+            # Support multiple values for comma-separated filters
+            def parse_multi(val):
+                if val is None:
+                    return None
+                return [v.strip() for v in val.split(",") if v.strip()]
+
+            run_type = parse_multi(run_type)
+            purpose = parse_multi(purpose)
+            question_type = parse_multi(question_type)
+            question_input_type = parse_multi(question_input_type)
+            org_ids = parse_multi(org_id)
+            course_ids = parse_multi(course_id)
+
+            org_ids = [int(id) for id in org_ids] if org_ids else None
+            course_ids = [int(id) for id in course_ids] if course_ids else None
+
+            # Update the queue with filters
+            await update_queue(
+                queue_id=int(queue_id),
+                annotation_filter=annotation_filter,
+                annotation_filter_user_id=annotation_filter_user_id,
+                time_range=time_range,
+                org_ids=org_ids,
+                course_ids=course_ids,
+                run_type=run_type,
+                purpose=purpose,
+                question_type=question_type,
+                question_input_type=question_input_type,
+            )
+        else:
+            # When specific runs are selected, update with run IDs
+            await update_queue(queue_id=int(queue_id), runs=run_ids)
+
+        return JSONResponse(
+            {"success": True, "message": f"Runs added to queue {queue_id} successfully"}
+        )
 
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)

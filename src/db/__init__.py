@@ -1000,3 +1000,133 @@ async def get_last_run_time():
         await cursor.execute(f"SELECT MAX(start_time) FROM {runs_table_name}")
         row = await cursor.fetchone()
         return row[0]
+
+
+@log_exceptions
+async def update_queue(
+    queue_id: int,
+    runs: Optional[List[int]] = None,
+    # Filter parameters for selecting all filtered runs
+    annotation_filter: str = None,
+    annotation_filter_user_id: int = None,
+    time_range: str = None,
+    org_ids: list = None,
+    course_ids: list = None,
+    run_type: list = None,
+    purpose: list = None,
+    question_type: list = None,
+    question_input_type: list = None,
+):
+    """
+    Update an existing queue by adding new runs that match the criteria.
+    Only adds runs that are not already in the queue.
+
+    Args:
+        queue_id: ID of the queue to update
+        runs: Optional list of specific run IDs to include
+
+        # Filter parameters - if provided, will select all runs matching these filters
+        annotation_filter: Filter by annotation status
+        annotation_filter_user_id: User ID for annotation filtering
+        time_range: Time range filter
+        org_ids: List of organization IDs
+        course_ids: List of course IDs
+        run_type: List of run types
+        purpose: List of purposes
+        question_type: List of question types
+        question_input_type: List of input types
+
+    Returns:
+        Dictionary with success status and number of runs added
+    """
+    async with get_new_db_connection() as conn:
+        cursor = await conn.cursor()
+
+        # Verify queue exists
+        await cursor.execute(
+            f"SELECT id FROM {queues_table_name} WHERE id = ?",
+            (queue_id,),
+        )
+        if not await cursor.fetchone():
+            raise Exception("Queue not found")
+
+        runs_added = 0
+
+        # Add runs to the queue
+        if runs:
+            # Use specific run IDs - get existing runs first to avoid duplicates
+            await cursor.execute(
+                f"SELECT run_id FROM {queue_runs_table_name} WHERE queue_id = ?",
+                (queue_id,),
+            )
+            existing_runs = {row[0] for row in await cursor.fetchall()}
+
+            # Filter out runs that are already in the queue
+            new_runs = [run_id for run_id in runs if run_id not in existing_runs]
+
+            if new_runs:
+                values = [(queue_id, run_id) for run_id in new_runs]
+                await cursor.executemany(
+                    f"""
+                    INSERT INTO {queue_runs_table_name} (queue_id, run_id)
+                    VALUES (?, ?)
+                    """,
+                    values,
+                )
+                runs_added = len(new_runs)
+
+        elif any(
+            [
+                annotation_filter,
+                time_range,
+                org_ids,
+                course_ids,
+                run_type,
+                purpose,
+                question_type,
+                question_input_type,
+            ]
+        ):
+            # Use filters to select runs - only add ones not already in the queue
+            base_query = f"""
+                INSERT INTO {queue_runs_table_name} (queue_id, run_id)
+                SELECT ?, r.id
+                FROM {runs_table_name} r
+                LEFT JOIN {annotations_table_name} a ON r.id = a.run_id
+                LEFT JOIN {users_table_name} u ON a.user_id = u.id
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM {queue_runs_table_name} qr 
+                    WHERE qr.queue_id = ? AND qr.run_id = r.id
+                )
+            """
+
+            # Build WHERE clause based on filters (same logic as create_queue)
+            where_conditions, params = build_run_filters(
+                annotation_filter=annotation_filter,
+                annotation_filter_user_id=annotation_filter_user_id,
+                time_range=time_range,
+                org_ids=org_ids,
+                course_ids=course_ids,
+                run_type=run_type,
+                purpose=purpose,
+                question_type=question_type,
+                question_input_type=question_input_type,
+                initial_params=[
+                    queue_id,
+                    queue_id,
+                ],  # For the INSERT SELECT and NOT EXISTS
+            )
+
+            # Add additional WHERE conditions if there are filters
+            if where_conditions:
+                base_query += " AND " + " AND ".join(where_conditions)
+
+            # Execute the INSERT SELECT query
+            query = (
+                base_query + " GROUP BY r.id"
+            )  # GROUP BY to avoid duplicates from JOINs
+            result = await cursor.execute(query, params)
+            runs_added = result.rowcount
+
+        await conn.commit()
+        return {"success": True, "runs_added": runs_added}

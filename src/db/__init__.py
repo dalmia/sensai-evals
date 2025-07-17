@@ -370,6 +370,7 @@ async def get_queue(
     page_size: int = 20,
     annotation_filter: str = None,
     annotation_filter_user_id: int = None,
+    user_email: str = None,
 ):
     """
     Get a queue with its associated user information and runs with annotations, with pagination and annotation status filtering support.
@@ -399,10 +400,11 @@ async def get_queue(
         # Build WHERE clause for filtering runs in this queue
         where_conditions = ["q.id = ?"]
         params = [queue_id]
-        if annotation_filter:
+        if annotation_filter or user_email:
             filter_conds, filter_params = build_run_filters(
                 annotation_filter=annotation_filter,
                 annotation_filter_user_id=annotation_filter_user_id,
+                user_email=user_email,
             )
             where_conditions.extend(filter_conds)
             params.extend(filter_params)

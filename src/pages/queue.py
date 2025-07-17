@@ -49,7 +49,6 @@ def individual_queue_page(request, queue_id):
                     <!-- Queue Header -->
                     <div class="p-4 border-b border-gray-200">
                         <h2 id="queueHeader" class="text-lg font-semibold text-gray-900">Loading queue...</h2>
-                        <p id="queueCreator" class="text-sm text-gray-500">Loading...</p>
                     </div>
                     
                     <!-- Filters and Timestamp Header -->
@@ -90,22 +89,14 @@ def individual_queue_page(request, queue_id):
                                         </div>
                                     </div>
                                 </div>  
+                            </div>  
+                            <!-- Add Filter Button -->
+                            <div class="flex items-center ml-auto h-full relative">
+                                <button id="userEmailFilterBtn" onclick="toggleUserEmailFilterDialog()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs font-medium border border-gray-300 flex items-center space-x-1 ml-4 h-full w-full" style="height:100%">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 01-8 0 4 4 0 018 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v2m0 4h.01" /></svg>
+                                    <span>Filter</span>
+                                </button>
                             </div>
-                            
-                            <!-- Timestamp Sorting
-                            <div class="flex items-center" id="timestampHeader">
-                                <div class="relative">
-                                    <div class="text-xs text-gray-500 mb-1">Sort by</div>
-                                    <button onclick="toggleTimestampSort()" class="flex items-center text-gray-700 hover:text-gray-900 p-1 rounded transition-colors">
-                                        <span class="text-xs font-medium">Created At</span>
-                                        <div class="ml-1" id="timestampArrow">
-                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                            </svg>
-                                        </div>
-                                    </button>
-                                </div>
-                            </div> -->
                         </div>
                     </div>
                     
@@ -125,7 +116,7 @@ def individual_queue_page(request, queue_id):
                     </div>
                     
                     <!-- Queue Runs List -->
-                    <div id="runsList" class="overflow-y-auto" style="height: calc(100vh - 340px);">
+                    <div id="runsList" class="overflow-y-auto" style="height: calc(100vh - 300px);">
                         <!-- Loading Spinner -->
                         <div id="loadingSpinner" class="flex items-center justify-center py-12">
                             <div class="flex items-center space-x-2">
@@ -133,6 +124,19 @@ def individual_queue_page(request, queue_id):
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+            
+            <!-- User Email Filter Dialog - positioned outside runs container -->
+            <div id="userEmailFilterDialog" class="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-50 hidden" style="width: 288px;">
+                <div class="p-4">
+                    <div class="mb-2">
+                        <label for="userEmailFilterInput" class="block text-xs font-medium text-gray-700 mb-1">User Email</label>
+                        <input type="email" id="userEmailFilterInput" placeholder="Enter user email" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md mb-1" oninput="validateUserEmailFilterInput()">
+                        <div id="userEmailFilterError" class="text-xs text-red-500 hidden">Please enter a valid email address</div>
+                    </div>
+                    <button id="applyUserEmailFilterBtn" class="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mt-2" onclick="applyUserEmailFilter()">Apply Filter</button>
+                    <button id="removeUserEmailFilterBtn" class="w-full px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 mt-2" onclick="removeUserEmailFilter()" style="display: none;">Remove Filter</button>
                 </div>
             </div>
             

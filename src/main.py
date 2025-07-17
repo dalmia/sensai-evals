@@ -246,6 +246,7 @@ async def get_queue_api(queue_id: str, request: Request):
         page_size = int(params.get("page_size", 20))
         annotation_filter = params.get("annotation_filter")
         annotator_filter_user = params.get("annotator_filter_user")
+        user_email = params.get("user_email")
 
         # Get current user ID for annotation filtering
         annotation_filter_user_id = None
@@ -259,6 +260,7 @@ async def get_queue_api(queue_id: str, request: Request):
             page_size,
             annotation_filter=annotation_filter,
             annotation_filter_user_id=annotation_filter_user_id,
+            user_email=user_email,
         )
         total_pages = (total_count + page_size - 1) // page_size
 

@@ -6,6 +6,7 @@ let selectedAnnotator = '';
 let currentUser = ''; // Add currentUser variable
 let currentRunIndex = null; // Track currently selected run
 let navigatingFromSidebar = false; // Track if navigation is from within a sidebar
+let currentUserEmailFilter = ''; // Track current user email filter
 
 // Pagination variables
 let currentPage = 1;
@@ -66,12 +67,12 @@ function scrollToRun(runIndex) {
 }
 
 // Load queue data from API with pagination support
-async function loadQueueData(queueId, user, selectedRunId = '', page = 1, annotationFilter = currentFilter, annotator = selectedAnnotator) {
+async function loadQueueData(queueId, user, selectedRunId = '', page = 1, annotationFilter = currentFilter, annotator = selectedAnnotator, userEmail = '') {
     currentUser = user; // Set current user
     selectedAnnotator = annotator || user; // Set default annotator to logged-in user if not provided
     
     try {
-        // Build URL with pagination, annotation filter, and annotator filter parameters
+        // Build URL with pagination, annotation filter, annotator filter, and user email filter parameters
         const params = new URLSearchParams({
             page: page,
             page_size: pageSize
@@ -81,6 +82,9 @@ async function loadQueueData(queueId, user, selectedRunId = '', page = 1, annota
         }
         if (annotator && annotator !== '') {
             params.append('annotator_filter_user', annotator);
+        }
+        if (userEmail && userEmail !== '') {
+            params.append('user_email', userEmail);
         }
         
         const response = await fetch(`/api/queues/${queueId}?${params.toString()}`);
@@ -148,7 +152,7 @@ async function loadQueueData(queueId, user, selectedRunId = '', page = 1, annota
                         <div class="text-red-500 text-xl mb-4">⚠️</div>
                         <h3 class="text-lg font-medium text-red-600 mb-2">Error loading queue</h3>
                         <p class="text-sm text-gray-600 mb-4">${error.message}</p>
-                        <button onclick="loadQueueData(${queueId}, '${user}', '${selectedRunId}', ${page}, '${annotationFilter}', '${annotator}')" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                        <button onclick="loadQueueData(${queueId}, '${user}', '${selectedRunId}', ${page}, '${annotationFilter}', '${annotator}', '${userEmail}')" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
                             Retry
                         </button>
                     </div>
@@ -491,7 +495,7 @@ function filterByAnnotation(filter) {
     const pathParts = window.location.pathname.split('/');
     const queueId = pathParts[pathParts.length - 1];
     const user = currentUser;
-    loadQueueData(queueId, user, '', 1, filter, selectedAnnotator);
+    loadQueueData(queueId, user, '', 1, filter, selectedAnnotator, currentUserEmailFilter);
 }
 
 // Filter by annotator
@@ -503,7 +507,7 @@ function filterByAnnotator(annotator) {
     const pathParts = window.location.pathname.split('/');
     const queueId = pathParts[pathParts.length - 1];
     const user = currentUser;
-    loadQueueData(queueId, user, '', 1, currentFilter, annotator);
+    loadQueueData(queueId, user, '', 1, currentFilter, annotator, currentUserEmailFilter);
     // If annotation sidebar is open and a run is selected, refresh its content
     const annotationSidebar = document.getElementById('annotationSidebar');
     if (annotationSidebar && !annotationSidebar.classList.contains('hidden') && currentRunIndex !== null && runsData[currentRunIndex]) {
@@ -951,7 +955,7 @@ function goToPage(pageNum) {
         // Get current user from the global variable
         const user = currentUser;
         
-        loadQueueData(queueId, user, '', pageNum, currentFilter, selectedAnnotator);
+        loadQueueData(queueId, user, '', pageNum, currentFilter, selectedAnnotator, currentUserEmailFilter);
     }
 }
 
@@ -1003,6 +1007,114 @@ document.addEventListener('click', function(event) {
         const toggleButton = event.target.closest('button[onclick="toggleAnnotatorFilter()"]');
         if (!toggleButton) {
             annotatorFilterDropdown.classList.add('hidden');
+        }
+    }
+}); 
+
+// --- User Email Filter Dialog Logic ---
+function toggleUserEmailFilterDialog() {
+    const dialog = document.getElementById('userEmailFilterDialog');
+    const btn = document.getElementById('userEmailFilterBtn');
+    if (dialog && btn) {
+        dialog.classList.toggle('hidden');
+        // Focus input if opening
+        if (!dialog.classList.contains('hidden')) {
+            // Position dialog below the button
+            const btnRect = btn.getBoundingClientRect();
+            dialog.style.left = btnRect.left + 'px';
+            dialog.style.top = (btnRect.bottom + 8) + 'px'; // 8px gap below button
+            
+            // Show current email value in input
+            const emailInput = document.getElementById('userEmailFilterInput');
+            if (emailInput) {
+                emailInput.value = currentUserEmailFilter;
+            }
+            
+            // Show/hide remove button based on whether email filter is active
+            const removeBtn = document.getElementById('removeUserEmailFilterBtn');
+            if (removeBtn) {
+                if (currentUserEmailFilter) {
+                    removeBtn.style.display = 'block';
+                } else {
+                    removeBtn.style.display = 'none';
+                }
+            }
+            
+            setTimeout(() => {
+                if (emailInput) emailInput.focus();
+            }, 100);
+        }
+    }
+}
+
+function validateUserEmailFilterInput() {
+    const emailInput = document.getElementById('userEmailFilterInput');
+    const errorDiv = document.getElementById('userEmailFilterError');
+    if (!emailInput) return;
+    const value = emailInput.value.trim();
+    // Simple email regex for validation
+    const isValid = value === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    if (isValid) {
+        errorDiv.classList.add('hidden');
+    } else {
+        errorDiv.classList.remove('hidden');
+    }
+}
+
+function applyUserEmailFilter() {
+    const emailInput = document.getElementById('userEmailFilterInput');
+    const errorDiv = document.getElementById('userEmailFilterError');
+    
+    if (!emailInput) return;
+    
+    const email = emailInput.value.trim();
+    
+    // Validate email if provided
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errorDiv.classList.remove('hidden');
+        return;
+    }
+    
+    // Hide error if validation passes
+    errorDiv.classList.add('hidden');
+    
+    // Store the current email filter
+    currentUserEmailFilter = email;
+    
+    // Close the dialog
+    const dialog = document.getElementById('userEmailFilterDialog');
+    if (dialog) {
+        dialog.classList.add('hidden');
+    }
+    
+    // Get current queue ID from URL
+    const pathParts = window.location.pathname.split('/');
+    const queueId = pathParts[pathParts.length - 1];
+    
+    // Reload queue data with email filter along with current filters
+    loadQueueData(queueId, currentUser, '', 1, currentFilter, selectedAnnotator, email);
+}
+
+function removeUserEmailFilter() {
+    currentUserEmailFilter = ''; // Clear the filter
+    document.getElementById('userEmailFilterInput').value = ''; // Clear the input
+    document.getElementById('userEmailFilterDialog').classList.add('hidden'); // Hide dialog
+
+    // Reload data from server with no user email filter
+    const pathParts = window.location.pathname.split('/');
+    const queueId = pathParts[pathParts.length - 1];
+    const user = currentUser;
+    loadQueueData(queueId, user, '', 1, currentFilter, selectedAnnotator, '');
+}
+
+// Close dialog when clicking outside
+window.addEventListener('click', function(event) {
+    const dialog = document.getElementById('userEmailFilterDialog');
+    const btn = document.getElementById('userEmailFilterBtn');
+    if (!dialog || !btn) return;
+    if (!dialog.classList.contains('hidden')) {
+        if (!dialog.contains(event.target) && event.target !== btn && !btn.contains(event.target)) {
+            dialog.classList.add('hidden');
         }
     }
 }); 

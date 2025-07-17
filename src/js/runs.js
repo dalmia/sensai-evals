@@ -411,8 +411,16 @@ async function applyFilters(page = 1, saveToUrl = true) {
     const orgFilters = getCheckboxValues('.org-filter', 'org_id');
     const courseFilters = getCheckboxValues('.course-filter', 'course_id');
 
-    console.log(orgFilters)
-    console.log(courseFilters)
+    // Get user email filter value
+    let userEmail = '';
+    const userEmailInput = document.getElementById('userEmailFilter');
+    if (userEmailInput) {
+        userEmail = userEmailInput.value.trim();
+    } else {
+        // fallback to URL param if input not present
+        const urlParams = new URLSearchParams(window.location.search);
+        userEmail = urlParams.get('user_email') || '';
+    }
 
     // Only save filter state to URL if this is a user-triggered change
     if (saveToUrl) {
@@ -433,6 +441,7 @@ async function applyFilters(page = 1, saveToUrl = true) {
     if (purposeFilters.length > 0) params.append('purpose', purposeFilters.join(','));
     if (orgFilters.length > 0) params.append('org_id', orgFilters.join(','));
     if (courseFilters.length > 0) params.append('course_id', courseFilters.join(','));
+    if (userEmail) params.append('user_email', userEmail);
 
     // Fetch filtered/paginated data from backend
     try {

@@ -165,6 +165,7 @@ async def get_runs_api(request: Request):
         page_size = int(params.get("page_size", 20))
         sort_by = params.get("sort_by", "timestamp")
         sort_order = params.get("sort_order", "desc")
+        user_email = params.get("user_email")
 
         # Get current user ID for annotation filtering
         annotation_filter_user_id = None
@@ -204,6 +205,7 @@ async def get_runs_api(request: Request):
             annotation_filter_user_id=annotation_filter_user_id,
             sort_by=sort_by,
             sort_order=sort_order,
+            user_email=user_email,
         )
         total_pages = (total_count + page_size - 1) // page_size
         return JSONResponse(

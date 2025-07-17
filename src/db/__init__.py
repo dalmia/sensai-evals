@@ -59,6 +59,7 @@ def build_run_filters(
     purpose: list = None,
     question_type: list = None,
     question_input_type: list = None,
+    user_email: str = None,
     initial_params: list = None,
 ) -> Tuple[List[str], List]:
     """
@@ -74,6 +75,7 @@ def build_run_filters(
         purpose: List of purposes
         question_type: List of question types
         question_input_type: List of input types
+        user_email: Email to filter by (from metadata)
         initial_params: Initial parameters list to start with
 
     Returns:
@@ -154,6 +156,11 @@ def build_run_filters(
     add_multi_filter(
         "question_input_type", question_input_type, "$.question_input_type"
     )
+
+    # User email filter (single value)
+    if user_email:
+        where_conditions.append("JSON_EXTRACT(r.metadata, '$.user_email') = ?")
+        params.append(user_email)
 
     return where_conditions, params
 
@@ -765,6 +772,7 @@ async def fetch_all_runs(
     page_size: int = 20,
     sort_by: str = "timestamp",
     sort_order: str = "desc",
+    user_email: str = None,
 ):
     """
     Fetch runs from the database with their annotations, filtered by query parameters and paginated.
@@ -794,6 +802,7 @@ async def fetch_all_runs(
             purpose=purpose,
             question_type=question_type,
             question_input_type=question_input_type,
+            user_email=user_email,
         )
 
         # Add WHERE clause if there are conditions

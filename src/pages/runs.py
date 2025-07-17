@@ -51,7 +51,7 @@ def runs_page(request):
                             <h2 id="runsHeader" class="text-lg font-semibold text-gray-900">All runs</h2>
                         </div>
                         <button onclick="createAnnotationQueue()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                            Create annotation queue
+                            Add to annotation queue
                         </button>
                     </div>
                 </div>

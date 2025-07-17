@@ -122,6 +122,12 @@ function generateFiltersHTML(organizations, courses) {
             </div>
             <!-- Scrollable Filters -->
             <div class="flex-1 overflow-y-auto p-4 pt-2">
+                <!-- User Email Filter -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-medium text-gray-700 mb-3">User Email</h4>
+                    <input type="email" id="userEmailFilter" placeholder="Enter user email" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md mb-1" oninput="validateUserEmail()">
+                    <div id="userEmailError" class="text-xs text-red-500 hidden">Please enter a valid email address</div>
+                </div>
                 <!-- Annotation Status Filter -->
                 <div class="mb-6">
                     <h4 class="text-sm font-medium text-gray-700 mb-3">Annotation Status</h4>
@@ -229,7 +235,7 @@ function generateFiltersHTML(organizations, courses) {
                 <!-- Organization Filter -->
                 <div class="mb-6">
                     <h4 class="text-sm font-medium text-gray-700 mb-3">Organization</h4>
-                    <input type="text" id="orgSearch" placeholder="Search organizations..." class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md mb-3" onkeyup="filterOrganizations()">
+                    <input type="text" id="orgSearch" placeholder="Search organizations" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md mb-3" onkeyup="filterOrganizations()">
                     <div id="orgList" class="space-y-2 max-h-40 overflow-y-auto">
                         ${organizations.map(org => `
                             <label class="flex items-center">
@@ -242,7 +248,7 @@ function generateFiltersHTML(organizations, courses) {
                 <!-- Course Filter -->
                 <div class="mb-6">
                     <h4 class="text-sm font-medium text-gray-700 mb-3">Course</h4>
-                    <input type="text" id="courseSearch" placeholder="Search courses..." class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md mb-3" onkeyup="filterCourses()">
+                    <input type="text" id="courseSearch" placeholder="Search courses" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md mb-3" onkeyup="filterCourses()">
                     <div id="courseList" class="space-y-2 max-h-40 overflow-y-auto">
                         ${courses.map(course => `
                             <label class="flex items-center">
@@ -1323,5 +1329,20 @@ function closeCreateQueueModal() {
     const modal = document.getElementById('createQueueModal');
     if (modal) {
         modal.remove();
+    }
+} 
+
+// Add this at the end of the file to ensure global scope for the HTML oninput handler
+function validateUserEmail() {
+    const emailInput = document.getElementById('userEmailFilter');
+    const errorDiv = document.getElementById('userEmailError');
+    if (!emailInput) return;
+    const value = emailInput.value.trim();
+    // Simple email regex for validation
+    const isValid = value === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    if (isValid) {
+        errorDiv.classList.add('hidden');
+    } else {
+        errorDiv.classList.remove('hidden');
     }
 } 

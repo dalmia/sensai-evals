@@ -236,14 +236,28 @@ async def get_queues_api(request: Request):
 
 @app.get("/api/queues/{queue_id}")
 async def get_queue_api(queue_id: str, request: Request):
-    """API endpoint to get a specific queue with pagination support"""
+    """API endpoint to get a specific queue with pagination and annotation status filtering support"""
     try:
-        # Get pagination parameters from query string
+        # Get pagination and filter parameters from query string
         params = request.query_params
         page = int(params.get("page", 1))
         page_size = int(params.get("page_size", 20))
+        annotation_filter = params.get("annotation_filter")
+        annotator_filter_user = params.get("annotator_filter_user")
 
-        queue_data, total_count = await get_queue(int(queue_id), page, page_size)
+        # Get current user ID for annotation filtering
+        annotation_filter_user_id = None
+        if annotation_filter:
+            if annotator_filter_user and annotator_filter_user in VALID_USERS:
+                annotation_filter_user_id = VALID_USERS[annotator_filter_user]["id"]
+
+        queue_data, total_count = await get_queue(
+            int(queue_id),
+            page,
+            page_size,
+            annotation_filter=annotation_filter,
+            annotation_filter_user_id=annotation_filter_user_id,
+        )
         total_pages = (total_count + page_size - 1) // page_size
 
         return JSONResponse(

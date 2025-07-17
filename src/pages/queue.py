@@ -72,7 +72,7 @@ def individual_queue_page(request, queue_id):
                                     </div>
                                 </div>
                                 
-                                <!-- Status Filter
+                                <!-- Status Filter -->
                                 <div class="relative">
                                     <div class="text-xs text-gray-500 mb-1">Status</div>
                                     <button onclick="toggleAnnotationFilter()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs font-medium border border-gray-300 flex items-center space-x-1">
@@ -83,13 +83,13 @@ def individual_queue_page(request, queue_id):
                                     </button>
                                     <div id="annotationFilterDropdown" class="absolute left-0 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-10 hidden">
                                         <div class="py-1">
-                                            <button onclick="filterByAnnotation('all')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">All</button>
-                                            <button onclick="filterByAnnotation('empty')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Not Annotated</button>
-                                            <button onclick="filterByAnnotation('correct')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Correct</button>
-                                            <button onclick="filterByAnnotation('wrong')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Wrong</button>
+                                            <button onclick="filterByAnnotation('all', '{user}')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">All</button>
+                                            <button onclick="filterByAnnotation('empty', '{user}')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Not Annotated</button>
+                                            <button onclick="filterByAnnotation('correct', '{user}')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Correct</button>
+                                            <button onclick="filterByAnnotation('wrong', '{user}')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Wrong</button>
                                         </div>
                                     </div>
-                                </div>  -->
+                                </div>  
                             </div>
                             
                             <!-- Timestamp Sorting

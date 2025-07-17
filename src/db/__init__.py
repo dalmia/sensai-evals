@@ -357,9 +357,15 @@ async def create_user(name: str):
         return cursor.lastrowid
 
 
-async def get_queue(queue_id: int, page: int = 1, page_size: int = 20):
+async def get_queue(
+    queue_id: int,
+    page: int = 1,
+    page_size: int = 20,
+    annotation_filter: str = None,
+    annotation_filter_user_id: int = None,
+):
     """
-    Get a queue with its associated user information and runs with annotations, with pagination support.
+    Get a queue with its associated user information and runs with annotations, with pagination and annotation status filtering support.
     """
     async with get_new_db_connection() as conn:
         cursor = await conn.cursor()
@@ -383,23 +389,36 @@ async def get_queue(queue_id: int, page: int = 1, page_size: int = 20):
             "created_at": queue_details[4],
         }
 
-        # Get total count of runs in this queue
+        # Build WHERE clause for filtering runs in this queue
+        where_conditions = ["q.id = ?"]
+        params = [queue_id]
+        if annotation_filter:
+            filter_conds, filter_params = build_run_filters(
+                annotation_filter=annotation_filter,
+                annotation_filter_user_id=annotation_filter_user_id,
+            )
+            where_conditions.extend(filter_conds)
+            params.extend(filter_params)
+        where_clause = " AND ".join(where_conditions)
+
+        # Get total count of runs in this queue (with filter)
         await cursor.execute(
             f"""
             SELECT COUNT(DISTINCT r.id)
             FROM {queues_table_name} q
             LEFT JOIN {queue_runs_table_name} qr ON q.id = qr.queue_id
             LEFT JOIN {runs_table_name} r ON qr.run_id = r.id
-            WHERE q.id = ?
+            LEFT JOIN {annotations_table_name} a ON r.id = a.run_id
+            WHERE {where_clause}
             """,
-            (queue_id,),
+            params,
         )
         total_count = (await cursor.fetchone())[0]
 
         # Calculate offset for pagination
         offset = (page - 1) * page_size
 
-        # Get paginated runs with annotations
+        # Get paginated runs with annotations (with filter)
         await cursor.execute(
             f"""
                 SELECT r.id as run_id, r.run_id as span_id, r.start_time, r.end_time, r.messages, r.metadata, r.created_at as run_created_at, a.judgement, a.notes, a.created_at as annotation_timestamp, ann_user.name as annotation_username
@@ -408,11 +427,11 @@ async def get_queue(queue_id: int, page: int = 1, page_size: int = 20):
             LEFT JOIN {runs_table_name} r ON qr.run_id = r.id
             LEFT JOIN {annotations_table_name} a ON r.id = a.run_id
             LEFT JOIN {users_table_name} ann_user ON a.user_id = ann_user.id
-            WHERE q.id = ?
+            WHERE {where_clause}
             ORDER BY r.created_at DESC
             LIMIT ? OFFSET ?
             """,
-            (queue_id, page_size, offset),
+            params + [page_size, offset],
         )
 
         rows = await cursor.fetchall()

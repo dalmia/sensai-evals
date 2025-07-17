@@ -66,16 +66,22 @@ function scrollToRun(runIndex) {
 }
 
 // Load queue data from API with pagination support
-async function loadQueueData(queueId, user, selectedRunId = '', page = 1) {
+async function loadQueueData(queueId, user, selectedRunId = '', page = 1, annotationFilter = currentFilter, annotator = selectedAnnotator) {
     currentUser = user; // Set current user
-    selectedAnnotator = user; // Set default annotator to logged-in user
+    selectedAnnotator = annotator || user; // Set default annotator to logged-in user if not provided
     
     try {
-        // Build URL with pagination parameters
+        // Build URL with pagination, annotation filter, and annotator filter parameters
         const params = new URLSearchParams({
             page: page,
             page_size: pageSize
         });
+        if (annotationFilter && annotationFilter !== 'all') {
+            params.append('annotation_filter', annotationFilter === 'empty' ? 'unannotated' : annotationFilter);
+        }
+        if (annotator && annotator !== '') {
+            params.append('annotator_filter_user', annotator);
+        }
         
         const response = await fetch(`/api/queues/${queueId}?${params.toString()}`);
         const data = await response.json();
@@ -142,7 +148,7 @@ async function loadQueueData(queueId, user, selectedRunId = '', page = 1) {
                         <div class="text-red-500 text-xl mb-4">⚠️</div>
                         <h3 class="text-lg font-medium text-red-600 mb-2">Error loading queue</h3>
                         <p class="text-sm text-gray-600 mb-4">${error.message}</p>
-                        <button onclick="loadQueueData(${queueId}, '${user}', '${selectedRunId}', ${page})" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                        <button onclick="loadQueueData(${queueId}, '${user}', '${selectedRunId}', ${page}, '${annotationFilter}', '${annotator}')" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
                             Retry
                         </button>
                     </div>
@@ -481,7 +487,11 @@ function filterByAnnotation(filter) {
     };
     document.getElementById('currentFilter').textContent = filterLabels[filter];
     document.getElementById('annotationFilterDropdown').classList.add('hidden');
-    updateRunsDisplay();
+    // Reload data from server with new filter
+    const pathParts = window.location.pathname.split('/');
+    const queueId = pathParts[pathParts.length - 1];
+    const user = currentUser;
+    loadQueueData(queueId, user, '', 1, filter, selectedAnnotator);
 }
 
 // Filter by annotator
@@ -489,9 +499,11 @@ function filterByAnnotator(annotator) {
     selectedAnnotator = annotator; // Update selectedAnnotator
     document.getElementById('currentAnnotator').textContent = annotator;
     document.getElementById('annotatorFilterDropdown').classList.add('hidden');
-    // Refresh the display since annotation status depends on selected annotator
-    updateRunsDisplay();
-    
+    // Reload data from server with new annotator
+    const pathParts = window.location.pathname.split('/');
+    const queueId = pathParts[pathParts.length - 1];
+    const user = currentUser;
+    loadQueueData(queueId, user, '', 1, currentFilter, annotator);
     // If annotation sidebar is open and a run is selected, refresh its content
     const annotationSidebar = document.getElementById('annotationSidebar');
     if (annotationSidebar && !annotationSidebar.classList.contains('hidden') && currentRunIndex !== null && runsData[currentRunIndex]) {
@@ -937,9 +949,9 @@ function goToPage(pageNum) {
         const queueId = pathParts[pathParts.length - 1];
         
         // Get current user from the global variable
-        const currentUser = selectedAnnotator;
+        const user = currentUser;
         
-        loadQueueData(queueId, currentUser, '', pageNum);
+        loadQueueData(queueId, user, '', pageNum, currentFilter, selectedAnnotator);
     }
 }
 

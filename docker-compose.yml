@@ -23,6 +23,7 @@ services:
     environment:
       - S3_LLM_TRACES_KEY=${S3_LLM_TRACES_KEY}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - TZ=Asia/Kolkata
     volumes:
       - /appdata_prod:/appdata
-    command: sh -c "echo '30 2 * * * cd /app/src && python -m cron >> /appdata/logs/evals-cron.log 2>&1' | crontab - && cron -f"
+    command: sh -c "echo '#!/bin/bash' > /app/cron_script.sh && echo 'export S3_LLM_TRACES_KEY=${S3_LLM_TRACES_KEY}' >> /app/cron_script.sh && echo 'export S3_BUCKET_NAME=${S3_BUCKET_NAME}' >> /app/cron_script.sh && echo 'cd /app/src' >> /app/cron_script.sh && echo '/usr/local/bin/python -m cron' >> /app/cron_script.sh && chmod +x /app/cron_script.sh && echo '0 8 * * * /app/cron_script.sh >> /appdata/logs/evals-cron.log 2>&1' | crontab - && cron -f"

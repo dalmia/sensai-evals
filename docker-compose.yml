@@ -25,4 +25,4 @@ services:
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
     volumes:
       - /appdata_prod:/appdata
-    command: sh -c "echo '30 2 * * * cd /app/src && python -m cron' | crontab - && cron -f"
+    command: sh -c "echo '30 2 * * * cd /app/src && python -m cron >> /appdata/logs/evals-cron.log 2>&1' | crontab - && cron -f"

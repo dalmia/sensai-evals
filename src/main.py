@@ -10,6 +10,7 @@ from auth import VALID_USERS, get_current_user, require_auth
 from pages.runs import runs_page
 from pages.queues import queues_page
 from pages.queue import individual_queue_page
+from pages.overview import overview_page
 from dotenv import load_dotenv
 from db import (
     fetch_all_runs,
@@ -38,15 +39,15 @@ app.add_middleware(SessionMiddleware, secret_key="your-secret-key-here")
 
 @app.get("/")
 def home(request):
-    """Home page route - redirects to /runs if user is logged in, otherwise to login"""
-    from auth import require_auth, get_current_user
+    """Home page route - shows overview if user is logged in, otherwise redirects to login"""
+    from auth import require_auth
 
     auth_redirect = require_auth(request)
     if auth_redirect:
         return auth_redirect
 
-    # If user is logged in, redirect to /runs
-    return RedirectResponse(url="/runs", status_code=302)
+    # If user is logged in, show overview page
+    return overview_page(request)
 
 
 @app.get("/runs")
@@ -72,7 +73,7 @@ def login_page(request):
     """Login page"""
     user = get_current_user(request)
     if user:
-        return RedirectResponse(url="/runs", status_code=302)
+        return RedirectResponse(url="/", status_code=302)
 
     # Generate options from VALID_USERS dictionary
     options_html = ""
@@ -118,7 +119,7 @@ async def login_post(request):
 
     if username in VALID_USERS and VALID_USERS[username]["password"] == password:
         request.session["user"] = username
-        return RedirectResponse(url="/runs", status_code=302)
+        return RedirectResponse(url="/", status_code=302)
     else:
         return Html(
             Head(Title("Login Failed - FastHTML Auth")),
@@ -284,6 +285,18 @@ async def get_filter_data():
     try:
         data = await get_unique_orgs_and_courses()
         return JSONResponse(data)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/metrics")
+async def get_metrics_api(request: Request):
+    """API endpoint to get overview metrics"""
+    try:
+        from db import get_metrics
+
+        metrics_data = await get_metrics()
+        return JSONResponse(metrics_data)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 

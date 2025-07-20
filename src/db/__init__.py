@@ -13,6 +13,7 @@ from .config import (
 from contextlib import asynccontextmanager
 import aiosqlite
 import traceback
+import numpy as np
 from typing import Optional, List, Tuple
 import asyncio
 import functools
@@ -947,8 +948,6 @@ async def get_unique_orgs_and_courses():
                 continue
             try:
                 # metadata may be a JSON string
-                import json
-
                 meta = json.loads(metadata)
             except Exception:
                 continue
@@ -1130,3 +1129,107 @@ async def update_queue(
 
         await conn.commit()
         return {"success": True, "runs_added": runs_added}
+
+
+async def get_metrics():
+    async with get_new_db_connection() as conn:
+        cursor = await conn.cursor()
+
+        # Number of runs
+        await cursor.execute(f"SELECT COUNT(*) FROM {runs_table_name}")
+        num_runs = (await cursor.fetchone())[0]
+
+        # Number of unique users across all runs (from metadata->user_id)
+        await cursor.execute(f"SELECT metadata FROM {runs_table_name}")
+        rows = await cursor.fetchall()
+        user_ids = set()
+
+        for row in rows:
+            metadata = row[0]
+            if metadata:
+                try:
+                    meta = json.loads(metadata)
+                    user_id = meta.get("user_id")
+                    if user_id is not None:
+                        user_ids.add(user_id)
+                except Exception:
+                    continue
+
+        num_unique_users = len(user_ids)
+
+        # Get annotator-level metrics (this will be our primary query)
+        await cursor.execute(
+            f"""
+            SELECT user_id, judgement, COUNT(*) as count
+            FROM {annotations_table_name}
+            GROUP BY user_id, judgement
+        """
+        )
+
+        annotator_rows = await cursor.fetchall()
+
+        # Process annotator data and aggregate totals
+        annotator_stats = {}
+        num_annotations = 0
+        num_correct = 0
+        num_wrong = 0
+
+        for user_id, judgement, count in annotator_rows:
+            if user_id not in annotator_stats:
+                annotator_stats[user_id] = {"correct": 0, "wrong": 0, "total": 0}
+
+            # Aggregate totals while processing annotator data
+            num_annotations += count
+
+            if str(judgement).lower() == "correct":
+                annotator_stats[user_id]["correct"] = count
+                num_correct += count
+            elif str(judgement).lower() == "wrong":
+                annotator_stats[user_id]["wrong"] = count
+                num_wrong += count
+
+            annotator_stats[user_id]["total"] += count
+
+        # Get user names from the users table
+        await cursor.execute(f"SELECT id, name FROM {users_table_name}")
+        user_name_rows = await cursor.fetchall()
+        user_id_to_name = {user_id: name for user_id, name in user_name_rows}
+
+        # Create leaderboard data with names and calculate accuracy
+        leaderboard = []
+        for user_id, stats in annotator_stats.items():
+            if stats["total"] > 0:  # Only include users with annotations
+                accuracy = (
+                    (stats["correct"] / stats["total"]) * 100
+                    if stats["total"] > 0
+                    else 0
+                )
+                leaderboard.append(
+                    {
+                        "user_id": user_id,
+                        "name": user_id_to_name.get(user_id, f"User {user_id}"),
+                        "total_annotations": stats["total"],
+                        "correct": stats["correct"],
+                        "wrong": stats["wrong"],
+                        "accuracy": round(accuracy, 1),
+                    }
+                )
+
+        # Sort by total annotations descending, then by accuracy descending
+        leaderboard.sort(
+            key=lambda x: (x["total_annotations"], x["accuracy"]), reverse=True
+        )
+
+        return {
+            "num_runs": num_runs,
+            "num_unique_users": num_unique_users,
+            "num_annotations": num_annotations,
+            "num_correct": num_correct,
+            "num_wrong": num_wrong,
+            "accuracy": (
+                np.round((num_correct / num_annotations) * 100, 2)
+                if num_annotations > 0
+                else 0
+            ),
+            "leaderboard": leaderboard,
+        }

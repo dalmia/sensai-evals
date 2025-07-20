@@ -1,5 +1,10 @@
-def create_header(user, active_tab="runs"):
+def create_header(user, active_tab="overview"):
     """Create reusable header component"""
+    overview_class = (
+        "text-blue-600 font-medium border-b-2 border-blue-600 pb-2"
+        if active_tab == "overview"
+        else "text-gray-500 hover:text-gray-700 pb-2"
+    )
     runs_class = (
         "text-blue-600 font-medium border-b-2 border-blue-600 pb-2"
         if active_tab == "runs"
@@ -21,6 +26,7 @@ def create_header(user, active_tab="runs"):
                     
                     <!-- Navigation Tabs -->
                     <div class="flex space-x-8">
+                        <a href="/" class="{overview_class}">Overview</a>
                         <a href="/runs" class="{runs_class}">Runs</a>
                         <a href="/queues" class="{queues_class}">Annotation Queues</a>
                     </div>

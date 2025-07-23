@@ -22,6 +22,7 @@ def individual_queue_page(request, queue_id):
 
     # Import the JavaScript for individual queue functionality
     queue_script = ScriptX("js/queue.js")
+    queue_run_row_script = ScriptX("js/components/queue_run_row.js")
 
     # Get annotators from VALID_USERS
     annotators = list(VALID_USERS.keys())
@@ -159,6 +160,7 @@ def individual_queue_page(request, queue_id):
             {create_annotation_sidebar()}
         </div>
         
+        {queue_run_row_script}
         {queue_script}
         <script>
             // Load data from API when page loads

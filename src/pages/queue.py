@@ -3,6 +3,8 @@ from components.header import create_header
 from components.annotation_sidebar import create_annotation_sidebar
 from components.metadata_sidebar import create_metadata_sidebar
 from components.queue_runs_list import create_queue_runs_list
+from components.chat_history import create_chat_history
+from components.selected_run_view import create_selected_run_view
 from fasthtml.common import ScriptX
 import json
 
@@ -32,6 +34,12 @@ def individual_queue_page(request, queue_id):
     annotator_filter_html = ""
     for annotator in annotators:
         annotator_filter_html += f'<button onclick="filterByAnnotator(\'{annotator}\')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">{annotator}</button>'
+
+    # Prepare JavaScript variables
+    js_queue_id = str(queue_id)
+    js_user = user
+    js_run_id_param = run_id_param
+    js_page_param = str(page_param)
 
     return f"""
     <!DOCTYPE html>
@@ -88,12 +96,38 @@ def individual_queue_page(request, queue_id):
             {create_annotation_sidebar()}
         </div>
         
+        {create_chat_history()}
+        {create_selected_run_view()}
         {queue_run_row_script}
         {queue_script}
         <script>
-            // Load data from API when page loads
+            // Function to check if all component functions are ready
+            function waitForComponents(callback) {{                
+                const requiredFunctions = [
+                    'window.generateMessagesHTML',
+                    'window.generateRunName', 
+                    'window.populateSelectedRunView',
+                    'window.showErrorState'
+                ];
+                
+                const allReady = requiredFunctions.every(function(funcPath) {{
+                    const parts = funcPath.split('.');
+                    let obj = window;
+                    for (let i = 1; i < parts.length; i++) {{
+                        obj = obj[parts[i]];
+                        if (!obj) return false;
+                    }}
+                    return typeof obj === 'function';
+                }});
+
+                callback();
+            }}
+            
+            // Load data from API when page loads and components are ready
             window.addEventListener('DOMContentLoaded', function() {{
-                loadQueueData({queue_id}, '{user}', '{run_id_param}', {page_param});
+                waitForComponents(function() {{
+                    loadQueueData({js_queue_id}, '{js_user}', '{js_run_id_param}', {js_page_param});
+                }});
             }});
         </script>
     </body>

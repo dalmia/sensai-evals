@@ -143,21 +143,27 @@ async function loadQueueData(queueId, user, selectedRunId = '', page = 1, annota
     } catch (error) {
         console.error('Error loading queue data:', error);
         
-        // Show error message
-        const mainContent = document.getElementById('mainContent');
-        if (mainContent) {
-            mainContent.innerHTML = `
-                <div class="bg-white rounded-lg shadow-sm flex items-center justify-center" style="height: calc(100vh - 120px);">
-                    <div class="text-center">
-                        <div class="text-red-500 text-xl mb-4">⚠️</div>
-                        <h3 class="text-lg font-medium text-red-600 mb-2">Error loading queue</h3>
-                        <p class="text-sm text-gray-600 mb-4">${error.message}</p>
-                        <button onclick="loadQueueData(${queueId}, '${user}', '${selectedRunId}', ${page}, '${annotationFilter}', '${annotator}', '${userEmail}')" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                            Retry
-                        </button>
+        // Show error message using the component function
+        const retryFunction = `loadQueueData(${queueId}, '${user}', '${selectedRunId}', ${page}, '${annotationFilter}', '${annotator}', '${userEmail}')`;
+        if (typeof window.showErrorState === 'function') {
+            window.showErrorState(error.message, retryFunction);
+        } else {
+            // Fallback error display
+            const mainContent = document.getElementById('mainContent');
+            if (mainContent) {
+                mainContent.innerHTML = `
+                    <div class="bg-white rounded-lg shadow-sm flex items-center justify-center" style="height: calc(100vh - 120px);">
+                        <div class="text-center">
+                            <div class="text-red-500 text-xl mb-4">⚠️</div>
+                            <h3 class="text-lg font-medium text-red-600 mb-2">Error loading queue</h3>
+                            <p class="text-sm text-gray-600 mb-4">${error.message}</p>
+                            <button onclick="${retryFunction}" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                                Retry
+                            </button>
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            }
         }
         
         // Also update the queue header to show error
@@ -241,61 +247,6 @@ function getAnnotationStatus(run) {
     return null;
 }
 
-// Helper function to create run name from metadata
-function getRunName(run) {
-    const metadata = run.metadata || {};
-    const runId = run.id || 'unknown';
-    const courseName = metadata.course?.name || '';
-    const milestoneName = metadata.milestone?.name || '';
-    const orgName = metadata.org?.name || '';
-    const taskTitle = metadata.task_title || '';
-    const questionTitle = metadata.question_title || '';
-    const runType = metadata.type || '';
-
-    let runName = '';
-
-    // Start with task title if available
-    if (taskTitle) {
-        runName = taskTitle;
-    }
-
-    // For quiz types, add question title after task title
-    if (runType === 'quiz' && questionTitle) {
-        if (runName) {
-            runName += ` - ${questionTitle}`;
-        } else {
-            runName = questionTitle;
-        }
-    }
-
-    // Add course and milestone information
-    if (courseName && milestoneName) {
-        if (runName) {
-            runName += ` - ${courseName} - ${milestoneName}`;
-        } else {
-            runName = `${courseName} - ${milestoneName}`;
-        }
-    } else if (courseName) {
-        if (runName) {
-            runName += ` - ${courseName}`;
-        } else {
-            runName = courseName;
-        }
-    }
-
-    // If no meaningful name constructed, use run ID
-    if (!runName) {
-        runName = `Run ${runId}`;
-    }
-
-    // Add organization name at the end
-    if (orgName) {
-        runName = `${runName} (${orgName})`;
-    }
-
-    return runName;
-}
-
 // Helper function to format timestamp
 function formatTimestamp(isoTimestamp) {
     try {
@@ -352,7 +303,7 @@ function generateRunsHTML(sortedRuns) {
     for (let i = 0; i < sortedRuns.length; i++) {
         const run = sortedRuns[i];
         const annotation = getAnnotationStatus(run);
-        const runName = getRunName(run);
+        const runName = window.generateRunName(run);
         const timestamp = formatTimestamp(run.start_time);
         
         // Find the original index of this run in the runsData array
@@ -500,250 +451,17 @@ function selectRun(runIndex) {
     
     if (!selectedRun) return;
     
-    // Create run name
-    const metadata = selectedRun.metadata || {};
-    const runId = selectedRun.id || 'unknown';
-    const courseName = metadata.course?.name || '';
-    const milestoneName = metadata.milestone?.name || '';
-    const orgName = metadata.org?.name || '';
-    const questionType = metadata.question_type || '';
-    
-    let runName;
-    if (courseName && milestoneName) {
-        runName = courseName + ' - ' + milestoneName;
-    } else if (courseName) {
-        runName = courseName;
+    // Use the new component function to populate the selected run view
+    if (typeof window.populateSelectedRunView === 'function') {
+        window.populateSelectedRunView(selectedRun, finalMetadataSidebarOpen, finalAnnotationSidebarOpen);
     } else {
-        runName = 'Run ' + runId;
-    }
-    
-    if (orgName) {
-        runName = runName + ' (' + orgName + ')';
-    }
-    
-    // Extract context and messages
-    const context = metadata.context || '';
-    const messages = selectedRun.messages;
-    
-    // Generate messages HTML
-    let messagesHtml = '';
-    messages.forEach((message, index) => {
-        const role = message.role || 'user';
-        const content = message.content || '';
-        
-        if (role === 'user') {
-            messagesHtml += '<div class="mb-6">' +
-                '<div class="bg-blue-500 text-white p-4 rounded-lg w-full">' +
-                '<div class="text-sm font-medium mb-2">User</div>' +
-                '<div class="whitespace-pre-wrap">' + content + '</div>' +
-                '</div>' +
-                '</div>';
-        } else if (role === 'assistant') {
-            // Handle assistant messages based on question type and content structure
-            if (questionType === 'objective' && typeof content === 'object' && content !== null) {
-                // For objective questions, show feedback and analysis tabs
-                const feedback = content.feedback || '';
-                const analysis = content.analysis || '';
-                const isCorrect = content.is_correct;
-                
-                // Status indicator
-                let indicatorHtml = '';
-                if (isCorrect === true) {
-                    indicatorHtml = '<div class="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">' +
-                        '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>' +
-                        '</svg>' +
-                        '</div>';
-                } else if (isCorrect === false) {
-                    indicatorHtml = '<div class="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">' +
-                        '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>' +
-                        '</svg>' +
-                        '</div>';
-                }
-                
-                messagesHtml += '<div class="mb-6">' +
-                    '<div class="bg-gray-50 border border-gray-200 p-4 rounded-lg w-full">' +
-                    '<div class="flex items-center gap-2 mb-2">' +
-                    '<span class="text-sm font-medium text-gray-700">Assistant</span>' +
-                    indicatorHtml +
-                    '</div>' +
-                    '<div class="mb-4">' +
-                    '<div class="flex space-x-4 border-b border-gray-200">' +
-                    '<button class="pb-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600 tab-button" onclick="showTab(\'feedback-' + index + '\', this)">' +
-                    'Feedback' +
-                    '</button>' +
-                    '<button class="pb-2 text-sm font-medium text-gray-500 tab-button" onclick="showTab(\'analysis-' + index + '\', this)">' +
-                    'Analysis' +
-                    '</button>' +
-                    '</div>' +
-                    '</div>' +
-                    '<div id="feedback-' + index + '" class="tab-content">' +
-                    '<div class="whitespace-pre-wrap text-sm">' + feedback + '</div>' +
-                    '</div>' +
-                    '<div id="analysis-' + index + '" class="tab-content hidden">' +
-                    '<div class="whitespace-pre-wrap text-sm">' + analysis + '</div>' +
-                    '</div>' +
-                    '</div>' +
-                    '</div>';
-            } else if (questionType === 'subjective' && typeof content === 'object' && content !== null) {
-                // For subjective questions, show feedback and scorecard tabs
-                const feedback = content.feedback || '';
-                const scorecard = content.scorecard || [];
-                
-                // Check if all criteria passed
-                let allPassed = true;
-                for (let i = 0; i < scorecard.length; i++) {
-                    const criterion = scorecard[i];
-                    const score = criterion.score || 0;
-                    const passScore = criterion.pass_score || 0;
-                    if (score < passScore) {
-                        allPassed = false;
-                        break;
-                    }
-                }
-                
-                // Status indicator based on all criteria passing
-                let indicatorHtml = '';
-                if (allPassed) {
-                    indicatorHtml = '<div class="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">' +
-                        '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>' +
-                        '</svg>' +
-                        '</div>';
-                } else {
-                    indicatorHtml = '<div class="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">' +
-                        '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>' +
-                        '</svg>' +
-                        '</div>';
-                }
-                
-                // Generate scorecard HTML
-                let scorecardHtml = '';
-                scorecard.forEach(criterion => {
-                    const category = criterion.category || '';
-                    const score = criterion.score || 0;
-                    const maxScore = criterion.max_score || 0;
-                    const passScore = criterion.pass_score || 0;
-                    const criterionFeedback = criterion.feedback || {};
-                    
-                    // Determine if this criterion passed
-                    const criterionPassed = score >= passScore;
-                    const criterionIcon = criterionPassed ? 
-                        '<div class="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">' +
-                        '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>' +
-                        '</svg>' +
-                        '</div>' :
-                        '<div class="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">' +
-                        '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>' +
-                        '</svg>' +
-                        '</div>';
-                    
-                    scorecardHtml += '<div class="mb-6 p-4 border border-gray-200 rounded-lg bg-white">' +
-                        '<div class="flex items-center justify-between mb-3">' +
-                        '<div class="flex items-center gap-3">' +
-                        criterionIcon +
-                        '<h3 class="text-lg font-medium text-gray-900">' + category + '</h3>' +
-                        '</div>' +
-                        '<div class="text-sm text-gray-600">' +
-                        score + '/' + maxScore + ' (Pass: ' + passScore + ')' +
-                        '</div>' +
-                        '</div>' +
-                        '<div class="text-sm text-gray-700">' +
-                        '<span class="text-green-600 font-medium">✓ Correct:</span> ' + (criterionFeedback.correct || '') +
-                        '</div>';
-                    
-                    if (criterionFeedback.wrong) {
-                        scorecardHtml += '<div class="text-sm text-gray-700 mt-2">' +
-                            '<span class="text-red-600 font-medium">Wrong:</span> ' + criterionFeedback.wrong +
-                            '</div>';
-                    }
-                    
-                    scorecardHtml += '</div>';
-                });
-                
-                messagesHtml += '<div class="mb-6">' +
-                    '<div class="bg-gray-50 border border-gray-200 p-4 rounded-lg w-full">' +
-                    '<div class="flex items-center gap-2 mb-2">' +
-                    '<span class="text-sm font-medium text-gray-700">Assistant</span>' +
-                    indicatorHtml +
-                    '</div>' +
-                    '<div class="mb-4">' +
-                    '<div class="flex space-x-4 border-b border-gray-200">' +
-                    '<button class="pb-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600 tab-button" onclick="showTab(\'feedback-' + index + '\', this)">' +
-                    'Feedback' +
-                    '</button>' +
-                    '<button class="pb-2 text-sm font-medium text-gray-500 tab-button" onclick="showTab(\'scorecard-' + index + '\', this)">' +
-                    'Scorecard' +
-                    '</button>' +
-                    '</div>' +
-                    '</div>' +
-                    '<div id="feedback-' + index + '" class="tab-content">' +
-                    '<div class="whitespace-pre-wrap text-sm">' + feedback + '</div>' +
-                    '</div>' +
-                    '<div id="scorecard-' + index + '" class="tab-content hidden">' +
-                    '<div class="space-y-4">' + scorecardHtml + '</div>' +
-                    '</div>' +
-                    '</div>' +
-                    '</div>';
-            } else {
-                // Handle simple text responses or other cases
-                const contentText = typeof content === 'string' ? content : JSON.stringify(content);
-                messagesHtml += '<div class="mb-6">' +
-                    '<div class="bg-gray-50 border border-gray-200 p-4 rounded-lg w-full">' +
-                    '<div class="text-sm font-medium text-gray-700 mb-2">Assistant</div>' +
-                    '<div class="text-sm text-gray-900 whitespace-pre-wrap">' + contentText + '</div>' +
-                    '</div>' +
-                    '</div>';
-            }
+        console.error('populateSelectedRunView function not available');
+        // Fallback to show error
+        const mainContent = document.getElementById('mainContent');
+        if (mainContent) {
+            mainContent.innerHTML = '<div class="bg-white rounded-lg shadow-sm flex items-center justify-center" style="height: calc(100vh - 120px);"><div class="text-center"><h3 class="text-lg font-medium text-red-600 mb-2">Component loading error</h3><p class="text-sm text-gray-600">Please refresh the page</p></div></div>';
         }
-    });
-    
-    // Get the main content area
-    const mainContent = document.getElementById('mainContent');
-    
-    // Create button classes based on sidebar states
-    const annotationButtonClasses = finalAnnotationSidebarOpen 
-        ? 'flex items-center space-x-2 bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium border border-blue-600 transition-colors'
-        : 'flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium border border-gray-300 transition-colors';
-    
-    const metadataButtonClasses = finalMetadataSidebarOpen 
-        ? 'flex items-center space-x-2 bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium border border-blue-600 transition-colors'
-        : 'flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium border border-gray-300 transition-colors';
-    
-    // Create span visibility based on sidebar states
-    const anySidebarOpen = finalMetadataSidebarOpen || finalAnnotationSidebarOpen;
-    const annotationSpanStyle = anySidebarOpen ? 'style="display: none;"' : '';
-    const metadataSpanStyle = anySidebarOpen ? 'style="display: none;"' : '';
-    
-    mainContent.innerHTML = '<div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden flex flex-col" style="height: calc(100vh - 120px);">' +
-        '<div class="border-b border-gray-200 px-6 py-4 flex-shrink-0">' +
-        '<div class="flex justify-between items-center">' +
-        '<h1 class="text-lg font-semibold text-gray-900">' + runName + '</h1>' +
-        '<div class="flex space-x-2">' +
-        '<button class="' + annotationButtonClasses + '" onclick="toggleAnnotationSidebar()">' +
-        '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>' +
-        '<span ' + annotationSpanStyle + '>Annotation</span>' +
-        '</button>' +
-        '<button class="' + metadataButtonClasses + '" onclick="toggleMetadataSidebar()">' +
-        '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>' +
-        '<span ' + metadataSpanStyle + '>Metadata</span>' +
-        '</button>' +
-        '</div>' +
-        '</div>' +
-        '</div>' +
-        '<div class="flex-1 overflow-y-auto p-6 min-h-0">' +
-        '<div class="mb-8">' +
-        '<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">' +
-        '<div class="text-sm text-yellow-700 whitespace-pre-wrap">' + context + '</div>' +
-        '</div>' +
-        '</div>' +
-        '<div class="space-y-6">' + messagesHtml + '</div>' +
-        '</div>' +
-        '</div>';
+    }
     
     // Populate metadata content using the component function
     populateMetadataContent(selectedRun);
@@ -761,96 +479,6 @@ function selectRun(runIndex) {
     
     // Update the runs display to show the new selection state
     updateRunsDisplay();
-}
-
-// Function to show tab content (for objective questions)
-function showTab(tabId, buttonElement) {
-    // Hide all tab contents in the same message
-    const messageContainer = buttonElement.closest('.bg-gray-50');
-    const tabContents = messageContainer.querySelectorAll('.tab-content');
-    tabContents.forEach(content => content.classList.add('hidden'));
-    
-    // Remove active state from all tab buttons in the same message
-    const tabButtons = messageContainer.querySelectorAll('.tab-button');
-    tabButtons.forEach(button => {
-        button.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
-        button.classList.add('text-gray-500');
-    });
-    
-    // Show selected tab content
-    document.getElementById(tabId).classList.remove('hidden');
-    
-    // Add active state to clicked button
-    buttonElement.classList.remove('text-gray-500');
-    buttonElement.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
-}
-
-// Function to populate metadata content
-function populateMetadataContent(run) {
-    const metadataContent = document.getElementById('metadataContent');
-    if (!metadataContent || !run) return;
-    
-    const metadata = run.metadata || {};
-    
-    // Helper function to create metadata row
-    function createMetadataRow(label, value) {
-        if (value === null || value === undefined || value === '') {
-            value = 'N/A';
-        }
-        return '<div class="mb-4">' +
-            '<div class="text-sm font-medium text-gray-700 mb-1">' + label + '</div>' +
-            '<div class="text-sm text-gray-900">' + value + '</div>' +
-            '</div>';
-    }
-    
-    let metadataHtml = '';
-    
-    // Add each metadata field
-    metadataHtml += createMetadataRow('Stage', metadata.stage || '');
-    metadataHtml += createMetadataRow('Type', metadata.type || '');
-    metadataHtml += createMetadataRow('User', String(metadata.user_email || ''));
-    metadataHtml += createMetadataRow('Question', String(metadata.question_title || ''));
-    metadataHtml += createMetadataRow('Question Type', metadata.question_type || '');
-    metadataHtml += createMetadataRow('Purpose', metadata.question_purpose || '');
-    metadataHtml += createMetadataRow('Input Type', metadata.question_input_type || '');
-    metadataHtml += createMetadataRow('Has Context', metadata.question_has_context ? 'Yes' : 'No');
-    
-    // Organization, Course, Milestone
-    const org = metadata.org || {};
-    const course = metadata.course || {};
-    const milestone = metadata.milestone || {};
-    
-    metadataHtml += createMetadataRow('Organization', org.name || '');
-    metadataHtml += createMetadataRow('Course', course.name || '');
-    metadataHtml += createMetadataRow('Milestone', milestone.name || '');
-    
-    // Timing information
-    metadataHtml += createMetadataRow('Start Time', formatTimestamp(run.start_time || ''));
-    metadataHtml += createMetadataRow('End Time', formatTimestamp(run.end_time || ''));
-    
-    metadataContent.innerHTML = metadataHtml;
-}
-
-// Function to show tab content (for objective questions)
-function showTab(tabId, buttonElement) {
-    // Hide all tab contents in the same message
-    const messageContainer = buttonElement.closest('.bg-gray-50');
-    const tabContents = messageContainer.querySelectorAll('.tab-content');
-    tabContents.forEach(content => content.classList.add('hidden'));
-    
-    // Remove active state from all tab buttons in the same message
-    const tabButtons = messageContainer.querySelectorAll('.tab-button');
-    tabButtons.forEach(button => {
-        button.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
-        button.classList.add('text-gray-500');
-    });
-    
-    // Show selected tab content
-    document.getElementById(tabId).classList.remove('hidden');
-    
-    // Add active state to clicked button
-    buttonElement.classList.remove('text-gray-500');
-    buttonElement.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
 }
 
 // Pagination functions

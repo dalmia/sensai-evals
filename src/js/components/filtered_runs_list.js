@@ -110,6 +110,35 @@ function generateRunsHTML(sortedRuns) {
 // Function to update the runs display
 function updateRunsDisplay() {
     const displayRuns = getFilteredAndSortedRuns();
+    
+    // Check if filtered runs are empty
+    if (displayRuns.length === 0) {
+        // Reset current selection
+        currentRunIndex = null;
+        
+        // Clear the runs list
+        document.getElementById('runsList').innerHTML = '<div class="flex items-center justify-center py-8"><div class="text-center"><div class="text-gray-400 mb-2"><svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></div><p class="text-sm text-gray-600">No runs match the current filters</p></div></div>';
+        
+        // Clear main content
+        const mainContent = document.getElementById('mainContent');
+        if (mainContent) {
+            mainContent.innerHTML = '<div class="bg-white rounded-lg shadow-sm flex items-center justify-center" style="height: calc(100vh - 120px);"><div class="text-center"><div class="text-gray-400 mb-4"><svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></div><h3 class="text-lg font-medium text-gray-900 mb-2">No runs found</h3><p class="text-sm text-gray-600">Try adjusting your filters to see more results</p></div></div>';
+        }
+        
+        // Hide sidebars
+        const metadataSidebar = document.getElementById('metadataSidebar');
+        const annotationSidebar = document.getElementById('annotationSidebar');
+        if (metadataSidebar) metadataSidebar.classList.add('hidden');
+        if (annotationSidebar) annotationSidebar.classList.add('hidden');
+        
+        // Remove runId from URL
+        const url = new URL(window.location);
+        url.searchParams.delete('runId');
+        window.history.pushState({}, '', url);
+        
+        return;
+    }
+    
     document.getElementById('runsList').innerHTML = generateRunsHTML(displayRuns);
     
     // Restore run selection if one was selected from URL

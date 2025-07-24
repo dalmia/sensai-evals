@@ -164,6 +164,38 @@ function generateAnnotationsRunsHTML(sortedRuns) {
 const originalUpdateRunsDisplay = updateRunsDisplay;
 updateRunsDisplay = function() {
     const displayRuns = getFilteredAndSortedRuns();
+    
+    // Check if filtered runs are empty
+    if (displayRuns.length === 0) {
+        // Reset current selection
+        currentRunIndex = null;
+        
+        // Clear the runs list with annotations-specific message
+        document.getElementById('runsList').innerHTML = '<div class="flex items-center justify-center py-8"><div class="text-center"><div class="text-gray-400 mb-2"><svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M7 8h10m-10 4h6m-6 4h10M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z"></path></svg></div><p class="text-sm text-gray-600">No annotations match the current filters</p></div></div>';
+        
+        // Clear main content
+        const mainContent = document.getElementById('mainContent');
+        if (mainContent) {
+            mainContent.innerHTML = '<div class="bg-white rounded-lg shadow-sm flex items-center justify-center" style="height: calc(100vh - 120px);"><div class="text-center"><div class="text-gray-400 mb-4"><svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M7 8h10m-10 4h6m-6 4h10M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z"></path></svg></div><h3 class="text-lg font-medium text-gray-900 mb-2">No annotations found</h3><p class="text-sm text-gray-600">Try adjusting your filters to see more annotations</p></div></div>';
+        }
+        
+        // Hide sidebars
+        const metadataSidebar = document.getElementById('metadataSidebar');
+        const annotationSidebar = document.getElementById('annotationSidebar');
+        if (metadataSidebar) metadataSidebar.classList.add('hidden');
+        if (annotationSidebar) annotationSidebar.classList.add('hidden');
+        
+        // Remove runId from URL
+        const url = new URL(window.location);
+        url.searchParams.delete('runId');
+        window.history.pushState({}, '', url);
+        
+        // Update annotations header to show zero count
+        updateAnnotationsHeader();
+        
+        return;
+    }
+    
     document.getElementById('runsList').innerHTML = generateAnnotationsRunsHTML(displayRuns);
     
     // Restore run selection if one was selected from URL
@@ -183,7 +215,8 @@ function updateAnnotationsHeader() {
     const annotationsHeader = document.getElementById('annotationsHeader');
     
     if (annotationsHeader) {
-        annotationsHeader.textContent = `Annotations (${totalCount})`;
+        const filteredRuns = getFilteredAndSortedRuns();
+        annotationsHeader.textContent = `Annotations (${filteredRuns.length})`;
     }
 }
 

@@ -2,12 +2,12 @@
 // Uses shared functionality from filtered_runs_list.js
 
 // Load queue data from API with pagination support
-async function loadQueueData(queueId, user, selectedRunId = '', page = 1, annotationFilter = currentFilter, annotator = selectedAnnotator, userEmail = '') {
+async function loadQueueData(queueId, user, selectedRunId = '', page = 1, annotationFilter = currentFilter, annotator = selectedAnnotator, userEmail = '', taskTitle = '', questionTitle = '') {
     currentUser = user; // Set current user
     selectedAnnotator = annotator || user; // Set default annotator to logged-in user if not provided
     
     try {
-        // Build URL with pagination, annotation filter, annotator filter, and user email filter parameters
+        // Build URL with pagination, annotation filter, annotator filter, and text filter parameters
         const params = new URLSearchParams({
             page: page,
             page_size: pageSize
@@ -20,6 +20,12 @@ async function loadQueueData(queueId, user, selectedRunId = '', page = 1, annota
         }
         if (userEmail && userEmail !== '') {
             params.append('user_email', userEmail);
+        }
+        if (taskTitle && taskTitle !== '') {
+            params.append('task_title', taskTitle);
+        }
+        if (questionTitle && questionTitle !== '') {
+            params.append('question_title', questionTitle);
         }
         
         const response = await fetch(`/api/queues/${queueId}?${params.toString()}`);
@@ -79,7 +85,7 @@ async function loadQueueData(queueId, user, selectedRunId = '', page = 1, annota
         console.error('Error loading queue data:', error);
         
         // Show error message using the component function
-        const retryFunction = `loadQueueData(${queueId}, '${user}', '${selectedRunId}', ${page}, '${annotationFilter}', '${annotator}', '${userEmail}')`;
+        const retryFunction = `loadQueueData(${queueId}, '${user}', '${selectedRunId}', ${page}, '${annotationFilter}', '${annotator}', '${userEmail}', '${taskTitle}', '${questionTitle}')`;
         if (typeof window.showErrorState === 'function') {
             window.showErrorState(error.message, retryFunction);
         } else {
@@ -168,5 +174,5 @@ function initializeQueueData(data) {
 window.reloadDataWithFilters = function() {
     const pathParts = window.location.pathname.split('/');
     const queueId = pathParts[pathParts.length - 1];
-    loadQueueData(queueId, currentUser, '', 1, currentFilter, selectedAnnotator, currentUserEmailFilter);
+    loadQueueData(queueId, currentUser, '', currentPage, currentFilter, selectedAnnotator, currentUserEmailFilter, currentTaskTitleFilter, currentQuestionTitleFilter);
 }; 

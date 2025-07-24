@@ -10,6 +10,8 @@ let currentUser = '';
 let currentRunIndex = null;
 let navigatingFromSidebar = false;
 let currentUserEmailFilter = '';
+let currentTaskTitleFilter = '';
+let currentQuestionTitleFilter = '';
 
 // Pagination variables
 let currentPage = 1;
@@ -416,10 +418,10 @@ function nextPage() {
     }
 }
 
-// User Email Filter Dialog Logic
-function toggleUserEmailFilterDialog() {
-    const dialog = document.getElementById('userEmailFilterDialog');
-    const btn = document.getElementById('userEmailFilterBtn');
+// Text Filters Dialog Logic
+function toggleTextFiltersDialog() {
+    const dialog = document.getElementById('textFiltersDialog');
+    const btn = document.getElementById('textFiltersBtn');
     if (dialog && btn) {
         dialog.classList.toggle('hidden');
         // Focus input if opening
@@ -429,16 +431,19 @@ function toggleUserEmailFilterDialog() {
             dialog.style.left = btnRect.left + 'px';
             dialog.style.top = (btnRect.bottom + 8) + 'px'; // 8px gap below button
             
-            // Show current email value in input
+            // Show current filter values in inputs
             const emailInput = document.getElementById('userEmailFilterInput');
-            if (emailInput) {
-                emailInput.value = currentUserEmailFilter;
-            }
+            const taskTitleInput = document.getElementById('taskTitleFilterInput');
+            const questionTitleInput = document.getElementById('questionTitleFilterInput');
             
-            // Show/hide remove button based on whether email filter is active
-            const removeBtn = document.getElementById('removeUserEmailFilterBtn');
+            if (emailInput) emailInput.value = currentUserEmailFilter;
+            if (taskTitleInput) taskTitleInput.value = currentTaskTitleFilter;
+            if (questionTitleInput) questionTitleInput.value = currentQuestionTitleFilter;
+            
+            // Show/hide remove button based on whether any text filter is active
+            const removeBtn = document.getElementById('removeTextFiltersBtn');
             if (removeBtn) {
-                if (currentUserEmailFilter) {
+                if (currentUserEmailFilter || currentTaskTitleFilter || currentQuestionTitleFilter) {
                     removeBtn.style.display = 'block';
                 } else {
                     removeBtn.style.display = 'none';
@@ -452,27 +457,33 @@ function toggleUserEmailFilterDialog() {
     }
 }
 
-function validateUserEmailFilterInput() {
+function validateTextFilterInputs() {
     const emailInput = document.getElementById('userEmailFilterInput');
-    const errorDiv = document.getElementById('userEmailFilterError');
+    const errorDiv = document.getElementById('textFiltersError');
     if (!emailInput) return;
-    const value = emailInput.value.trim();
-    // Simple email regex for validation
-    const isValid = value === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-    if (isValid) {
+    
+    const emailValue = emailInput.value.trim();
+    // Simple email regex for validation - only validate if email field has content
+    const isEmailValid = emailValue === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue);
+    
+    if (isEmailValid) {
         errorDiv.classList.add('hidden');
     } else {
         errorDiv.classList.remove('hidden');
     }
 }
 
-function applyUserEmailFilter() {
+function applyTextFilters() {
     const emailInput = document.getElementById('userEmailFilterInput');
-    const errorDiv = document.getElementById('userEmailFilterError');
+    const taskTitleInput = document.getElementById('taskTitleFilterInput');
+    const questionTitleInput = document.getElementById('questionTitleFilterInput');
+    const errorDiv = document.getElementById('textFiltersError');
     
-    if (!emailInput) return;
+    if (!emailInput || !taskTitleInput || !questionTitleInput) return;
     
     const email = emailInput.value.trim();
+    const taskTitle = taskTitleInput.value.trim();
+    const questionTitle = questionTitleInput.value.trim();
     
     // Validate email if provided
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -483,11 +494,13 @@ function applyUserEmailFilter() {
     // Hide error if validation passes
     errorDiv.classList.add('hidden');
     
-    // Store the current email filter
+    // Store the current filters
     currentUserEmailFilter = email;
+    currentTaskTitleFilter = taskTitle;
+    currentQuestionTitleFilter = questionTitle;
     
     // Close the dialog
-    const dialog = document.getElementById('userEmailFilterDialog');
+    const dialog = document.getElementById('textFiltersDialog');
     if (dialog) {
         dialog.classList.add('hidden');
     }
@@ -498,10 +511,26 @@ function applyUserEmailFilter() {
     }
 }
 
-function removeUserEmailFilter() {
-    currentUserEmailFilter = ''; // Clear the filter
-    document.getElementById('userEmailFilterInput').value = ''; // Clear the input
-    document.getElementById('userEmailFilterDialog').classList.add('hidden'); // Hide dialog
+function removeTextFilters() {
+    // Clear all text filters
+    currentUserEmailFilter = '';
+    currentTaskTitleFilter = '';
+    currentQuestionTitleFilter = '';
+    
+    // Clear the inputs
+    const emailInput = document.getElementById('userEmailFilterInput');
+    const taskTitleInput = document.getElementById('taskTitleFilterInput');
+    const questionTitleInput = document.getElementById('questionTitleFilterInput');
+    
+    if (emailInput) emailInput.value = '';
+    if (taskTitleInput) taskTitleInput.value = '';
+    if (questionTitleInput) questionTitleInput.value = '';
+    
+    // Hide dialog
+    const dialog = document.getElementById('textFiltersDialog');
+    if (dialog) {
+        dialog.classList.add('hidden');
+    }
 
     // Call the page-specific reload function if it exists
     if (typeof window.reloadDataWithFilters === 'function') {
@@ -548,9 +577,9 @@ document.addEventListener('click', function(event) {
         }
     }
     
-    // Close user email filter dialog when clicking outside
-    const dialog = document.getElementById('userEmailFilterDialog');
-    const btn = document.getElementById('userEmailFilterBtn');
+    // Close text filters dialog when clicking outside
+    const dialog = document.getElementById('textFiltersDialog');
+    const btn = document.getElementById('textFiltersBtn');
     if (dialog && btn && !dialog.classList.contains('hidden')) {
         if (!dialog.contains(event.target) && event.target !== btn && !btn.contains(event.target)) {
             dialog.classList.add('hidden');

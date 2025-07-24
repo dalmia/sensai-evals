@@ -176,6 +176,8 @@ async def get_runs_api(request: Request):
         sort_by = params.get("sort_by", "timestamp")
         sort_order = params.get("sort_order", "desc")
         user_email = params.get("user_email")
+        task_title = params.get("task_title")
+        question_title = params.get("question_title")
         annotator_user = params.get(
             "annotator_user"
         )  # New parameter for filtering by annotator
@@ -224,6 +226,8 @@ async def get_runs_api(request: Request):
             sort_by=sort_by,
             sort_order=sort_order,
             user_email=user_email,
+            task_title=task_title,
+            question_title=question_title,
         )
         total_pages = (total_count + page_size - 1) // page_size
         return JSONResponse(
@@ -265,6 +269,8 @@ async def get_queue_api(queue_id: str, request: Request):
         annotation_filter = params.get("annotation_filter")
         annotator_filter_user = params.get("annotator_filter_user")
         user_email = params.get("user_email")
+        task_title = params.get("task_title")
+        question_title = params.get("question_title")
 
         # Get current user ID for annotation filtering
         annotation_filter_user_id = None
@@ -279,6 +285,8 @@ async def get_queue_api(queue_id: str, request: Request):
             annotation_filter=annotation_filter,
             annotation_filter_user_id=annotation_filter_user_id,
             user_email=user_email,
+            task_title=task_title,
+            question_title=question_title,
         )
         total_pages = (total_count + page_size - 1) // page_size
 

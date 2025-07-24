@@ -61,6 +61,8 @@ def build_run_filters(
     question_type: list = None,
     question_input_type: list = None,
     user_email: str = None,
+    task_title: str = None,
+    question_title: str = None,
     initial_params: list = None,
 ) -> Tuple[List[str], List]:
     """
@@ -77,6 +79,8 @@ def build_run_filters(
         question_type: List of question types
         question_input_type: List of input types
         user_email: Email to filter by (from metadata)
+        task_title: Task title to filter by (from metadata, substring match)
+        question_title: Question title to filter by (from metadata, substring match)
         initial_params: Initial parameters list to start with
 
     Returns:
@@ -156,6 +160,16 @@ def build_run_filters(
     if user_email:
         where_conditions.append("JSON_EXTRACT(r.metadata, '$.user_email') = ?")
         params.append(user_email)
+
+    # Task title filter (substring match)
+    if task_title:
+        where_conditions.append("JSON_EXTRACT(r.metadata, '$.task_title') LIKE ?")
+        params.append(f"%{task_title}%")
+
+    # Question title filter (substring match)
+    if question_title:
+        where_conditions.append("JSON_EXTRACT(r.metadata, '$.question_title') LIKE ?")
+        params.append(f"%{question_title}%")
 
     return where_conditions, params
 
@@ -366,6 +380,8 @@ async def get_queue(
     annotation_filter: str = None,
     annotation_filter_user_id: int = None,
     user_email: str = None,
+    task_title: str = None,
+    question_title: str = None,
 ):
     """
     Get a queue with its associated user information and runs with annotations, with pagination and annotation status filtering support.
@@ -395,11 +411,13 @@ async def get_queue(
         # Build WHERE clause for filtering runs in this queue
         where_conditions = ["q.id = ?"]
         params = [queue_id]
-        if annotation_filter or user_email:
+        if annotation_filter or user_email or task_title or question_title:
             filter_conds, filter_params = build_run_filters(
                 annotation_filter=annotation_filter,
                 annotation_filter_user_id=annotation_filter_user_id,
                 user_email=user_email,
+                task_title=task_title,
+                question_title=question_title,
             )
             where_conditions.extend(filter_conds)
             params.extend(filter_params)
@@ -770,6 +788,8 @@ async def fetch_all_runs(
     sort_by: str = "timestamp",
     sort_order: str = "desc",
     user_email: str = None,
+    task_title: str = None,
+    question_title: str = None,
 ):
     """
     Fetch runs from the database with their annotations, filtered by query parameters and paginated.
@@ -800,6 +820,8 @@ async def fetch_all_runs(
             question_type=question_type,
             question_input_type=question_input_type,
             user_email=user_email,
+            task_title=task_title,
+            question_title=question_title,
         )
 
         # Add WHERE clause if there are conditions

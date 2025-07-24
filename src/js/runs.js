@@ -128,6 +128,16 @@ function generateFiltersHTML(organizations, courses) {
                     <input type="email" id="userEmailFilter" placeholder="Enter user email" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md mb-1" oninput="validateUserEmail()">
                     <div id="userEmailError" class="text-xs text-red-500 hidden">Please enter a valid email address</div>
                 </div>
+                <!-- Task Title Filter -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-medium text-gray-700 mb-3">Task title</h4>
+                    <input type="text" id="taskTitleFilter" placeholder="Enter task title" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md">
+                </div>
+                <!-- Question Title Filter -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-medium text-gray-700 mb-3">Question title</h4>
+                    <input type="text" id="questionTitleFilter" placeholder="Enter question title" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md">
+                </div>
                 <!-- Annotation Status Filter -->
                 <div class="mb-6">
                     <h4 class="text-sm font-medium text-gray-700 mb-3">Annotation Status</h4>
@@ -422,6 +432,28 @@ async function applyFilters(page = 1, saveToUrl = true) {
         userEmail = urlParams.get('user_email') || '';
     }
 
+    // Get task title filter value
+    let taskTitle = '';
+    const taskTitleInput = document.getElementById('taskTitleFilter');
+    if (taskTitleInput) {
+        taskTitle = taskTitleInput.value.trim();
+    } else {
+        // fallback to URL param if input not present
+        const urlParams = new URLSearchParams(window.location.search);
+        taskTitle = urlParams.get('task_title') || '';
+    }
+
+    // Get question title filter value
+    let questionTitle = '';
+    const questionTitleInput = document.getElementById('questionTitleFilter');
+    if (questionTitleInput) {
+        questionTitle = questionTitleInput.value.trim();
+    } else {
+        // fallback to URL param if input not present
+        const urlParams = new URLSearchParams(window.location.search);
+        questionTitle = urlParams.get('question_title') || '';
+    }
+
     // Only save filter state to URL if this is a user-triggered change
     if (saveToUrl) {
         saveFiltersToURL(page);
@@ -448,6 +480,8 @@ async function applyFilters(page = 1, saveToUrl = true) {
     if (orgFilters.length > 0) params.append('org_id', orgFilters.join(','));
     if (courseFilters.length > 0) params.append('course_id', courseFilters.join(','));
     if (userEmail) params.append('user_email', userEmail);
+    if (taskTitle) params.append('task_title', taskTitle);
+    if (questionTitle) params.append('question_title', questionTitle);
 
     // Fetch filtered/paginated data from backend
     try {
@@ -632,6 +666,14 @@ function clearAllFilters() {
     const courseSearch = document.getElementById('courseSearch');
     if (orgSearch) orgSearch.value = '';
     if (courseSearch) courseSearch.value = '';
+
+    // Clear text filter inputs
+    const userEmailFilter = document.getElementById('userEmailFilter');
+    const taskTitleFilter = document.getElementById('taskTitleFilter');
+    const questionTitleFilter = document.getElementById('questionTitleFilter');
+    if (userEmailFilter) userEmailFilter.value = '';
+    if (taskTitleFilter) taskTitleFilter.value = '';
+    if (questionTitleFilter) questionTitleFilter.value = '';
     
     // Show all organizations and courses
     filterOrganizations();

@@ -15,6 +15,9 @@ getAnnotationStatus = function(run) {
     return null;
 };
 
+// Set page size for annotations page
+pageSize = 25;
+
 // Load annotations data from API
 async function loadAnnotationsData(user, selectedRunId = '') {
     currentUser = user;
@@ -49,6 +52,16 @@ async function loadAnnotationsData(user, selectedRunId = '') {
             params.append('user_email', currentUserEmailFilter);
         }
         
+        // Add task title filter if set
+        if (currentTaskTitleFilter) {
+            params.append('task_title', currentTaskTitleFilter);
+        }
+        
+        // Add question title filter if set
+        if (currentQuestionTitleFilter) {
+            params.append('question_title', currentQuestionTitleFilter);
+        }
+        
         const response = await fetch(`/api/runs?${params.toString()}`);
         const data = await response.json();
         
@@ -59,10 +72,13 @@ async function loadAnnotationsData(user, selectedRunId = '') {
         // Transform runs data to show individual annotations instead of runs
         runsData = transformRunsToAnnotations(data.runs || []);
         
-        // Update pagination for annotations (no real pagination needed)
+        // Update pagination for annotations (now paginated)
         totalCount = runsData.length;
-        totalPages = 1;
-        currentPage = 1;
+        totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+        // Try to get currentPage from URL, else reset to 1
+        const pageParams = new URLSearchParams(window.location.search);
+        const urlPage = parseInt(pageParams.get('page'), 10);
+        currentPage = (!isNaN(urlPage) && urlPage >= 1 && urlPage <= totalPages) ? urlPage : 1;
         
         // Update the UI using existing functions
         updateAnnotationsHeader();
@@ -222,7 +238,18 @@ updateRunsDisplay = function() {
             currentRunIndex = runIndex;
         }
     }
-}
+    updatePagination();
+};
+
+// Override getFilteredAndSortedRuns to paginate annotations
+const originalGetFilteredAndSortedRuns = getFilteredAndSortedRuns;
+getFilteredAndSortedRuns = function() {
+    let filteredSorted = originalGetFilteredAndSortedRuns();
+    // Paginate for current page
+    const startIdx = (currentPage - 1) * pageSize;
+    const endIdx = startIdx + pageSize;
+    return filteredSorted.slice(startIdx, endIdx);
+};
 
 // Update annotations header with count
 function updateAnnotationsHeader() {

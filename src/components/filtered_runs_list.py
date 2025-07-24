@@ -72,9 +72,9 @@ def create_filtered_runs_list(
                 </div>  
                 <!-- Add Filter Button -->
                 <div class="flex items-center ml-auto h-full relative">
-                    <button id="userEmailFilterBtn" onclick="toggleUserEmailFilterDialog()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs font-medium border border-gray-300 flex items-center space-x-1 ml-4 h-full w-full" style="height:100%">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 01-8 0 4 4 0 018 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v2m0 4h.01" /></svg>
-                        <span>Filter</span>
+                    <button id="textFiltersBtn" onclick="toggleTextFiltersDialog()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs font-medium border border-gray-300 flex items-center space-x-1 ml-4 h-full w-full" style="height:100%">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707v4.586l-4-4V9.414a1 1 0 00-.293-.707L3.293 6.707A1 1 0 013 6V4z" /></svg>
+                        <span>Filters</span>
                     </button>
                 </div>
             </div>
@@ -106,16 +106,30 @@ def create_filtered_runs_list(
         </div>
     </div>
     
-    <!-- User Email Filter Dialog - positioned outside runs container -->
-    <div id="userEmailFilterDialog" class="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-50 hidden" style="width: 288px;">
+    <!-- Text Filters Dialog - positioned outside runs container -->
+    <div id="textFiltersDialog" class="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-50 hidden" style="width: 320px;">
         <div class="p-4">
-            <div class="mb-2">
+            <h3 class="text-sm font-medium text-gray-900 mb-3">Text Filters</h3>
+            
+            <div class="mb-3">
                 <label for="userEmailFilterInput" class="block text-xs font-medium text-gray-700 mb-1">User email</label>
-                <input type="email" id="userEmailFilterInput" placeholder="Enter user email" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md mb-1" oninput="validateUserEmailFilterInput()">
-                <div id="userEmailFilterError" class="text-xs text-red-500 hidden">Please enter a valid email address</div>
+                <input type="email" id="userEmailFilterInput" placeholder="Enter user email" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md" oninput="validateTextFilterInputs()">
             </div>
-            <button id="applyUserEmailFilterBtn" class="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mt-2" onclick="applyUserEmailFilter()">Apply Filter</button>
-            <button id="removeUserEmailFilterBtn" class="w-full px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 mt-2" onclick="removeUserEmailFilter()" style="display: none;">Remove Filter</button>
+            
+            <div class="mb-3">
+                <label for="taskTitleFilterInput" class="block text-xs font-medium text-gray-700 mb-1">Task title</label>
+                <input type="text" id="taskTitleFilterInput" placeholder="Enter task title" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md" oninput="validateTextFilterInputs()">
+            </div>
+            
+            <div class="mb-3">
+                <label for="questionTitleFilterInput" class="block text-xs font-medium text-gray-700 mb-1">Question title</label>
+                <input type="text" id="questionTitleFilterInput" placeholder="Enter question title" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md" oninput="validateTextFilterInputs()">
+            </div>
+            
+            <div id="textFiltersError" class="text-xs text-red-500 hidden mb-2">Please enter a valid email address</div>
+            
+            <button id="applyTextFiltersBtn" class="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mt-2" onclick="applyTextFilters()">Apply Filters</button>
+            <button id="removeTextFiltersBtn" class="w-full px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 mt-2" onclick="removeTextFilters()" style="display: none;">Remove Filters</button>
         </div>
     </div>
     """

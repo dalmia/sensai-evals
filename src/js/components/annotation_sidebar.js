@@ -8,25 +8,36 @@ function populateAnnotationContent(run) {
     const annotationContent = document.getElementById('annotationContent');
     if (!annotationContent || !run) return;
     
-    const annotations = run.annotations || {};
-    const currentUserAnnotation = annotations[selectedAnnotator] || {};
+    // Handle the special case when selectedAnnotator is "all"
+    let actualAnnotator, actualAnnotation;
     
-    // Check if the selected annotator is the current user
-    const isCurrentUser = selectedAnnotator === currentUser;
+    if (selectedAnnotator === 'all') {
+        // Special case: use the actual annotator and annotation from the run
+        actualAnnotator = run.annotator;
+        actualAnnotation = run.annotation || {};
+    } else {
+        // Normal case: use the selected annotator
+        actualAnnotator = selectedAnnotator;
+        const annotations = run.annotations || {};
+        actualAnnotation = annotations[selectedAnnotator] || {};
+    }
+    
+    // Check if the actual annotator is the current user
+    const isCurrentUser = actualAnnotator === currentUser;
     
     // Store original annotation state for comparison (only for current user)
     if (isCurrentUser) {
         originalAnnotationState = {
-            judgement: currentUserAnnotation.judgement || null,
-            notes: currentUserAnnotation.notes || ''
+            judgement: actualAnnotation.judgement || null,
+            notes: actualAnnotation.notes || ''
         };
     }
     
     // Determine current annotation state
-    const hasCorrect = currentUserAnnotation.judgement === 'correct';
-    const hasWrong = currentUserAnnotation.judgement === 'wrong';
-    const hasNotes = currentUserAnnotation.notes && currentUserAnnotation.notes.trim().length > 0;
-    const hasAnyAnnotation = currentUserAnnotation.judgement || hasNotes;
+    const hasCorrect = actualAnnotation.judgement === 'correct';
+    const hasWrong = actualAnnotation.judgement === 'wrong';
+    const hasNotes = actualAnnotation.notes && actualAnnotation.notes.trim().length > 0;
+    const hasAnyAnnotation = actualAnnotation.judgement || hasNotes;
     
     // Determine navigation button states
     const canGoPrevious = currentRunIndex > 0;
@@ -37,14 +48,14 @@ function populateAnnotationContent(run) {
     if (!isCurrentUser && !hasAnyAnnotation) {
         // Show placeholder for no annotations when viewing another annotator
         annotationHtml = `
-            <div class="flex flex-col h-full">
-                <div class="flex-1 flex items-center justify-center">
+            <div class="flex flex-col">
+                <div class="flex-1 flex items-center justify-center my-12">
                     <div class="text-center text-gray-500">
                         <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
                         <h3 class="text-lg font-medium text-gray-900 mb-2">No annotations found</h3>
-                        <p class="text-sm text-gray-500">${selectedAnnotator} has not annotated this run yet</p>
+                        <p class="text-sm text-gray-500">${actualAnnotator} has not annotated this run yet</p>
                     </div>
                 </div>
                 
@@ -79,8 +90,8 @@ function populateAnnotationContent(run) {
         `;
     } else {
         // Generate annotation form HTML
-        const judgementSectionTitle = isCurrentUser ? 'Judgement' : `Judgement (${selectedAnnotator})`;
-        const notesSectionTitle = isCurrentUser ? 'Notes' : `Notes (${selectedAnnotator})`;
+        const judgementSectionTitle = isCurrentUser ? 'Judgement' : `Judgement (${actualAnnotator})`;
+        const notesSectionTitle = isCurrentUser ? 'Notes' : `Notes (${actualAnnotator})`;
         
         // Create judgement buttons - disable non-selected ones for view-only mode
         const correctButtonClass = hasCorrect 
@@ -133,7 +144,7 @@ function populateAnnotationContent(run) {
                               rows="6" 
                               class="${notesClass}"
                               placeholder="${isCurrentUser ? 'Add details about the annotation' : 'No notes provided'}"
-                              ${notesAttributes}>${currentUserAnnotation.notes || ''}</textarea>
+                              ${notesAttributes}>${actualAnnotation.notes || ''}</textarea>
                 </div>
                 
                 ${isCurrentUser ? `

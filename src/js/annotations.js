@@ -4,9 +4,9 @@
 // Load annotations data from API
 async function loadAnnotationsData(user, selectedRunId = '') {
     currentUser = user;
-    // Only set selectedAnnotator to current user if it hasn't been set yet (first load)
+    // Set selectedAnnotator to 'all' by default if it hasn't been set yet (first load)
     if (selectedAnnotator === '') {
-        selectedAnnotator = user; 
+        selectedAnnotator = 'all'; 
     }
     
     // Update the UI to show the current annotator selection
@@ -51,6 +51,7 @@ async function loadAnnotationsData(user, selectedRunId = '') {
         currentPage = 1;
         
         // Update the UI using existing functions
+        updateAnnotationsHeader();
         updateRunsDisplay();
         updatePagination();
         
@@ -83,6 +84,13 @@ async function loadAnnotationsData(user, selectedRunId = '') {
         
     } catch (error) {
         console.error('Error loading annotations data:', error);
+        
+        // Update header to show error state
+        const annotationsHeader = document.getElementById('annotationsHeader');
+        if (annotationsHeader) {
+            annotationsHeader.textContent = 'Error loading annotations';
+        }
+        
         // Use existing error handling if available
         if (typeof window.showErrorState === 'function') {
             window.showErrorState(error.message, `loadAnnotationsData('${user}', '${selectedRunId}')`);
@@ -167,6 +175,15 @@ updateRunsDisplay = function() {
         if (runIndex !== -1) {
             currentRunIndex = runIndex;
         }
+    }
+}
+
+// Update annotations header with count
+function updateAnnotationsHeader() {
+    const annotationsHeader = document.getElementById('annotationsHeader');
+    
+    if (annotationsHeader) {
+        annotationsHeader.textContent = `Annotations (${totalCount})`;
     }
 }
 

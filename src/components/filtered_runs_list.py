@@ -1,11 +1,19 @@
-def create_filtered_runs_list(user, annotator_filter_html, show_not_annotated=True):
+def create_filtered_runs_list(
+    user, annotator_filter_html, show_not_annotated=True, default_annotator=None
+):
     """Create reusable queue runs list component with filters and pagination
 
     Args:
         user: Current user name
         annotator_filter_html: HTML for annotator filter dropdown options
         show_not_annotated: Whether to show "Not Annotated" option in status filter (default: True)
+        default_annotator: Default annotator to display (default: user)
     """
+
+    # Set default annotator display value
+    initial_annotator_display = (
+        "All" if default_annotator == "all" else (default_annotator or user)
+    )
 
     # Generate status filter options based on configuration
     status_filter_options = "<button onclick=\"filterByAnnotation('all', '{user}')\" class=\"block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100\">All</button>".format(
@@ -34,7 +42,7 @@ def create_filtered_runs_list(user, annotator_filter_html, show_not_annotated=Tr
                     <div class="relative">
                         <div class="text-xs text-gray-500 mb-1">Annotator</div>
                         <button onclick="toggleAnnotatorFilter()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs font-medium border border-gray-300 flex items-center space-x-1">
-                            <span id="currentAnnotator">{user}</span>
+                            <span id="currentAnnotator">{initial_annotator_display}</span>
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                             </svg>
@@ -102,7 +110,7 @@ def create_filtered_runs_list(user, annotator_filter_html, show_not_annotated=Tr
     <div id="userEmailFilterDialog" class="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-50 hidden" style="width: 288px;">
         <div class="p-4">
             <div class="mb-2">
-                <label for="userEmailFilterInput" class="block text-xs font-medium text-gray-700 mb-1">User Email</label>
+                <label for="userEmailFilterInput" class="block text-xs font-medium text-gray-700 mb-1">User email</label>
                 <input type="email" id="userEmailFilterInput" placeholder="Enter user email" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md mb-1" oninput="validateUserEmailFilterInput()">
                 <div id="userEmailFilterError" class="text-xs text-red-500 hidden">Please enter a valid email address</div>
             </div>

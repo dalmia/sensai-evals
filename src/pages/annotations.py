@@ -41,7 +41,7 @@ def annotations_page(request):
 
     # Use the existing filtered_runs_list component
     runs_list = create_filtered_runs_list(
-        user, annotator_filter_html, show_not_annotated=False
+        user, annotator_filter_html, show_not_annotated=False, default_annotator="all"
     )
 
     return f"""

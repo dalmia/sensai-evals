@@ -70,9 +70,25 @@ async function loadQueueData(queueId, user, selectedRunId = '', page = 1, annota
             }
         }
         
-        // Automatically select the first run if available and no URL run was found
+        // Automatically select the first run as displayed if available and no URL run was found
         if (runsData.length > 0) {
-            selectRun(0);
+            // Get the first run as displayed (sorted/filtered)
+            if (typeof getFilteredAndSortedRuns === 'function') {
+                const displayRuns = getFilteredAndSortedRuns();
+                if (displayRuns.length > 0) {
+                    const firstDisplayedRunId = displayRuns[0].id;
+                    const runIndex = runsData.findIndex(run => run.id === firstDisplayedRunId);
+                    if (runIndex !== -1) {
+                        selectRun(runIndex);
+                    } else {
+                        selectRun(0); // fallback
+                    }
+                } else {
+                    selectRun(0); // fallback
+                }
+            } else {
+                selectRun(0);
+            }
         }
         
         // Hide loading spinner after data is loaded

@@ -20,7 +20,9 @@ async function loadAnnotationsData(user, selectedRunId = '') {
         const params = new URLSearchParams({
             page: 1,
             page_size: 1000, // Get all annotations
-            annotation_filter: currentFilter === 'all' ? '' : currentFilter
+            // When currentFilter is 'all', send 'annotated' to show all annotations
+            // When selectedAnnotator is 'all', we want all annotations from all annotators
+            annotation_filter: currentFilter === 'all' ? 'annotated' : currentFilter
         });
         
         // Add annotator filter if specific annotator is selected

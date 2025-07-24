@@ -433,7 +433,13 @@ async function applyFilters(page = 1, saveToUrl = true) {
     params.append('page_size', pageSize);
     params.append('sort_by', currentSort.by);
     params.append('sort_order', currentSort.order);
-    if (annotationFilter && annotationFilter !== 'all') params.append('annotation_filter', annotationFilter);
+    if (annotationFilter && annotationFilter !== 'all') {
+        params.append('annotation_filter', annotationFilter);
+        // Add current user as annotator_user to maintain existing behavior for runs page
+        if (currentUser) {
+            params.append('annotator_user', currentUser);
+        }
+    }
     if (timeRangeFilter && timeRangeFilter !== 'all') params.append('time_range', timeRangeFilter);
     if (typeFilters.length > 0) params.append('run_type', typeFilters.join(','));
     if (questionTypeFilters.length > 0) params.append('question_type', questionTypeFilters.join(','));

@@ -187,9 +187,10 @@ async def get_runs_api(request: Request):
         if annotator_user and annotator_user in VALID_USERS:
             # If specific annotator is requested, use that user's ID
             annotation_filter_user_id = VALID_USERS[annotator_user]["id"]
-        elif annotation_filter and user and user in VALID_USERS:
-            # If judgment filter is specified but no specific annotator, use current user's ID
-            annotation_filter_user_id = VALID_USERS[user]["id"]
+        # Remove the automatic defaulting to current user - let it be None to show all users' annotations
+        # elif annotation_filter and user and user in VALID_USERS:
+        #     # If judgment filter is specified but no specific annotator, use current user's ID
+        #     annotation_filter_user_id = VALID_USERS[user]["id"]
 
         # Support multiple values for comma-separated filters
         def parse_multi(val):

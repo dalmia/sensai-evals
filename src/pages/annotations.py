@@ -23,6 +23,7 @@ def annotations_page(request):
     annotation_sidebar_script = ScriptX("js/components/annotation_sidebar.js")
     metadata_sidebar_script = ScriptX("js/components/metadata_sidebar.js")
     selected_run_view_script = ScriptX("js/components/selected_run_view.js")
+    filtered_runs_list_script = ScriptX("js/components/filtered_runs_list.js")
     annotations_script = ScriptX("js/annotations.js")
     filtered_run_row_script = ScriptX("js/components/filtered_run_row.js")
 
@@ -90,6 +91,7 @@ def annotations_page(request):
         {metadata_sidebar_script}
         {selected_run_view_script}
         {filtered_run_row_script}
+        {filtered_runs_list_script}
         {annotations_script}
         
         <script>

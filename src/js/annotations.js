@@ -1,14 +1,7 @@
-let queueData = {}; // Keep same variable names for compatibility
-let runsData = [];
-let currentSort = {'by': 'timestamp', 'order': 'desc'};
-let currentFilter = 'all';
-let selectedAnnotator = '';
-let currentUser = '';
-let currentRunIndex = null;
-let navigatingFromSidebar = false;
-let currentUserEmailFilter = ''; // Track current user email filter
+// Annotations-specific functionality for annotations page
+// Uses shared functionality from filtered_runs_list.js
 
-// Load annotations data from API (similar to loadQueueData in queue.js)
+// Load annotations data from API
 async function loadAnnotationsData(user, selectedRunId = '') {
     currentUser = user;
     // Only set selectedAnnotator to current user if it hasn't been set yet (first load)
@@ -50,8 +43,14 @@ async function loadAnnotationsData(user, selectedRunId = '') {
         // Transform runs data to show individual annotations instead of runs
         runsData = transformRunsToAnnotations(data.runs || []);
         
+        // Update pagination for annotations (no real pagination needed)
+        totalCount = runsData.length;
+        totalPages = 1;
+        currentPage = 1;
+        
         // Update the UI using existing functions
         updateRunsDisplay();
+        updatePagination();
         
         // Handle run selection (same logic as queue.js)
         const urlParams = new URLSearchParams(window.location.search);
@@ -106,6 +105,8 @@ function transformRunsToAnnotations(runs) {
                             id: run.id, // Keep original run ID for selection
                             annotator: annotator,
                             annotation: annotationData,
+                            // Override start_time with annotation timestamp for proper sorting
+                            start_time: annotationData.created_at || run.start_time,
                             // Modify metadata to show annotation info
                             metadata: {
                                 ...run.metadata,
@@ -129,17 +130,11 @@ function transformRunsToAnnotations(runs) {
     return annotations;
 }
 
-// Use existing updateRunsDisplay function pattern
-function updateRunsDisplay() {
-    const displayRuns = runsData; // No additional filtering needed
-    document.getElementById('runsList').innerHTML = generateRunsHTML(displayRuns);
-}
-
-// Generate runs HTML using existing createQueueRunRow function
-function generateRunsHTML(runs) {
+// Override the generateRunsHTML function to include annotator info
+function generateAnnotationsRunsHTML(sortedRuns) {
     let runsHtml = '';
-    for (let i = 0; i < runs.length; i++) {
-        const run = runs[i];
+    for (let i = 0; i < sortedRuns.length; i++) {
+        const run = sortedRuns[i];
         const annotation = run.annotation?.judgement || null;
         
         // Create enhanced run name with annotator info
@@ -155,247 +150,25 @@ function generateRunsHTML(runs) {
     return runsHtml;
 }
 
-// Use existing selectRun function pattern
-function selectRun(runIndex) {
-    // Same logic as queue.js selectRun function
-    if (runsData[runIndex]) {
-        const runId = runsData[runIndex].id;
-        const url = new URL(window.location);
-        url.searchParams.set('runId', runId);
-        window.history.pushState({}, '', url);
-    }
+// Override updateRunsDisplay to use annotations-specific HTML generation
+const originalUpdateRunsDisplay = updateRunsDisplay;
+updateRunsDisplay = function() {
+    const displayRuns = getFilteredAndSortedRuns();
+    document.getElementById('runsList').innerHTML = generateAnnotationsRunsHTML(displayRuns);
     
-    const metadataSidebar = document.getElementById('metadataSidebar');
-    const annotationSidebar = document.getElementById('annotationSidebar');
-    
-    const metadataSidebarWasOpen = metadataSidebar && !metadataSidebar.classList.contains('hidden');
-    const annotationSidebarWasOpen = annotationSidebar && !annotationSidebar.classList.contains('hidden');
-    
-    let finalMetadataSidebarOpen = metadataSidebarWasOpen;
-    let finalAnnotationSidebarOpen = annotationSidebarWasOpen;
-    
-    if (!navigatingFromSidebar) {
-        if (metadataSidebarWasOpen) {
-            finalMetadataSidebarOpen = true;
-            finalAnnotationSidebarOpen = false;
-        } else {
-            finalMetadataSidebarOpen = false;
-            finalAnnotationSidebarOpen = true;
+    // Restore run selection if one was selected from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlRunId = urlParams.get('runId');
+    if (urlRunId) {
+        // Find the run with matching runId and ensure it's visually selected
+        const runIndex = runsData.findIndex(run => run.id === urlRunId);
+        if (runIndex !== -1) {
+            currentRunIndex = runIndex;
         }
     }
-    
-    navigatingFromSidebar = false;
-    currentRunIndex = runIndex;
-    const selectedRun = runsData[runIndex];
-    
-    if (!selectedRun) return;
-    
-    // Use existing component functions
-    if (typeof window.populateSelectedRunView === 'function') {
-        window.populateSelectedRunView(selectedRun, finalMetadataSidebarOpen, finalAnnotationSidebarOpen);
-    }
-    
-    populateMetadataContent(selectedRun);
-    
-    if (finalMetadataSidebarOpen && metadataSidebar) {
-        metadataSidebar.classList.remove('hidden');
-    }
-    
-    if (finalAnnotationSidebarOpen && annotationSidebar) {
-        annotationSidebar.classList.remove('hidden');
-        populateAnnotationContent(selectedRun);
-    }
-    
-    updateRunsDisplay();
 }
 
-// Use existing filter function names
-function filterByAnnotator(annotator) {
-    selectedAnnotator = annotator;
-    document.getElementById('currentAnnotator').textContent = annotator === 'all' ? 'All' : annotator;
-    document.getElementById('annotatorFilterDropdown').classList.add('hidden');
+// Page-specific reload function called by shared filter functions
+window.reloadDataWithFilters = function() {
     loadAnnotationsData(currentUser);
-}
-
-function filterByAnnotation(filter, user) {
-    currentFilter = filter;
-    document.getElementById('currentFilter').textContent = filter === 'all' ? 'All' : filter.charAt(0).toUpperCase() + filter.slice(1);
-    document.getElementById('annotationFilterDropdown').classList.add('hidden');
-    loadAnnotationsData(currentUser);
-}
-
-// Use existing navigation functions
-function goToPrevious() {
-    if (currentRunIndex > 0) {
-        navigatingFromSidebar = true;
-        selectRun(currentRunIndex - 1);
-    }
-}
-
-function goToNext() {
-    if (currentRunIndex < runsData.length - 1) {
-        navigatingFromSidebar = true;
-        selectRun(currentRunIndex + 1);
-    }
-}
-
-// Helper function
-function formatTimestamp(isoTimestamp) {
-    try {
-        const date = new Date(isoTimestamp);
-        return date.toLocaleString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-        });
-    } catch (e) {
-        return isoTimestamp;
-    }
-}
-
-// Use existing dropdown functions
-function toggleAnnotatorFilter() {
-    const dropdown = document.getElementById('annotatorFilterDropdown');
-    dropdown.classList.toggle('hidden');
-}
-
-function toggleAnnotationFilter() {
-    const dropdown = document.getElementById('annotationFilterDropdown');
-    dropdown.classList.toggle('hidden');
-}
-
-function toggleDropdown() {
-    const dropdown = document.getElementById('dropdown');
-    dropdown.classList.toggle('hidden');
-}
-
-// No-op pagination functions since we load all annotations
-function previousPage() {}
-function nextPage() {}
-
-// --- User Email Filter Dialog Logic ---
-function toggleUserEmailFilterDialog() {
-    const dialog = document.getElementById('userEmailFilterDialog');
-    const btn = document.getElementById('userEmailFilterBtn');
-    if (dialog && btn) {
-        dialog.classList.toggle('hidden');
-        // Focus input if opening
-        if (!dialog.classList.contains('hidden')) {
-            // Position dialog below the button
-            const btnRect = btn.getBoundingClientRect();
-            dialog.style.left = btnRect.left + 'px';
-            dialog.style.top = (btnRect.bottom + 8) + 'px'; // 8px gap below button
-            
-            // Show current email value in input
-            const emailInput = document.getElementById('userEmailFilterInput');
-            if (emailInput) {
-                emailInput.value = currentUserEmailFilter;
-            }
-            
-            // Show/hide remove button based on whether email filter is active
-            const removeBtn = document.getElementById('removeUserEmailFilterBtn');
-            if (removeBtn) {
-                if (currentUserEmailFilter) {
-                    removeBtn.style.display = 'block';
-                } else {
-                    removeBtn.style.display = 'none';
-                }
-            }
-            
-            setTimeout(() => {
-                if (emailInput) emailInput.focus();
-            }, 100);
-        }
-    }
-}
-
-function validateUserEmailFilterInput() {
-    const emailInput = document.getElementById('userEmailFilterInput');
-    const errorDiv = document.getElementById('userEmailFilterError');
-    if (!emailInput) return;
-    const value = emailInput.value.trim();
-    // Simple email regex for validation
-    const isValid = value === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-    if (isValid) {
-        errorDiv.classList.add('hidden');
-    } else {
-        errorDiv.classList.remove('hidden');
-    }
-}
-
-function applyUserEmailFilter() {
-    const emailInput = document.getElementById('userEmailFilterInput');
-    const errorDiv = document.getElementById('userEmailFilterError');
-    
-    if (!emailInput) return;
-    
-    const email = emailInput.value.trim();
-    
-    // Validate email if provided
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        errorDiv.classList.remove('hidden');
-        return;
-    }
-    
-    // Hide error if validation passes
-    errorDiv.classList.add('hidden');
-    
-    // Store the current email filter
-    currentUserEmailFilter = email;
-    
-    // Close the dialog
-    const dialog = document.getElementById('userEmailFilterDialog');
-    if (dialog) {
-        dialog.classList.add('hidden');
-    }
-    
-    // Reload annotations data with email filter
-    loadAnnotationsData(currentUser);
-}
-
-function removeUserEmailFilter() {
-    currentUserEmailFilter = ''; // Clear the filter
-    document.getElementById('userEmailFilterInput').value = ''; // Clear the input
-    document.getElementById('userEmailFilterDialog').classList.add('hidden'); // Hide dialog
-
-    // Reload annotations data with no user email filter
-    loadAnnotationsData(currentUser);
-}
-
-// Use existing click handler
-document.addEventListener('click', function(event) {
-    const dropdown = document.getElementById('dropdown');
-    const button = event.target.closest('button');
-    
-    if (!button || button.getAttribute('onclick') !== 'toggleDropdown()') {
-        dropdown.classList.add('hidden');
-    }
-    
-    const annotatorFilterDropdown = document.getElementById('annotatorFilterDropdown');
-    if (annotatorFilterDropdown && !event.target.closest('#annotatorFilterDropdown')) {
-        const toggleButton = event.target.closest('button[onclick="toggleAnnotatorFilter()"]');
-        if (!toggleButton) {
-            annotatorFilterDropdown.classList.add('hidden');
-        }
-    }
-    
-    const annotationFilterDropdown = document.getElementById('annotationFilterDropdown');
-    if (annotationFilterDropdown && !event.target.closest('#annotationFilterDropdown')) {
-        const toggleButton = event.target.closest('button[onclick="toggleAnnotationFilter()"]');
-        if (!toggleButton) {
-            annotationFilterDropdown.classList.add('hidden');
-        }
-    }
-    
-    // Close user email filter dialog when clicking outside
-    const dialog = document.getElementById('userEmailFilterDialog');
-    const btn = document.getElementById('userEmailFilterBtn');
-    if (dialog && btn && !dialog.classList.contains('hidden')) {
-        if (!dialog.contains(event.target) && event.target !== btn && !btn.contains(event.target)) {
-            dialog.classList.add('hidden');
-        }
-    }
-}); 
+}; 

@@ -3,8 +3,6 @@ from components.header import create_header
 from components.annotation_sidebar import create_annotation_sidebar
 from components.metadata_sidebar import create_metadata_sidebar
 from components.queue_runs_list import create_queue_runs_list
-from components.chat_history import create_chat_history
-from components.selected_run_view import create_selected_run_view
 from fasthtml.common import ScriptX
 import json
 
@@ -24,6 +22,10 @@ def individual_queue_page(request, queue_id):
     page_param = int(request.query_params.get("page", 1))
 
     # Import the JavaScript for individual queue functionality
+    chat_history_script = ScriptX("js/components/chat_history.js")
+    annotation_sidebar_script = ScriptX("js/components/annotation_sidebar.js")
+    metadata_sidebar_script = ScriptX("js/components/metadata_sidebar.js")
+    selected_run_view_script = ScriptX("js/components/selected_run_view.js")
     queue_script = ScriptX("js/queue.js")
     queue_run_row_script = ScriptX("js/components/queue_run_row.js")
 
@@ -64,19 +66,6 @@ def individual_queue_page(request, queue_id):
                 </div>
             </div>
             
-            <!-- User Email Filter Dialog - positioned outside runs container -->
-            <div id="userEmailFilterDialog" class="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-50 hidden" style="width: 288px;">
-                <div class="p-4">
-                    <div class="mb-2">
-                        <label for="userEmailFilterInput" class="block text-xs font-medium text-gray-700 mb-1">User Email</label>
-                        <input type="email" id="userEmailFilterInput" placeholder="Enter user email" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md mb-1" oninput="validateUserEmailFilterInput()">
-                        <div id="userEmailFilterError" class="text-xs text-red-500 hidden">Please enter a valid email address</div>
-                    </div>
-                    <button id="applyUserEmailFilterBtn" class="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mt-2" onclick="applyUserEmailFilter()">Apply Filter</button>
-                    <button id="removeUserEmailFilterBtn" class="w-full px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 mt-2" onclick="removeUserEmailFilter()" style="display: none;">Remove Filter</button>
-                </div>
-            </div>
-            
             <!-- Main Content Area -->
             <div class="flex-1 transition-all duration-300 relative p-4" id="mainContent">
                 <div class="bg-white rounded-lg shadow-sm flex items-center justify-center" style="height: calc(100vh - 120px);">
@@ -96,38 +85,17 @@ def individual_queue_page(request, queue_id):
             {create_annotation_sidebar()}
         </div>
         
-        {create_chat_history()}
-        {create_selected_run_view()}
+        {chat_history_script}
+        {annotation_sidebar_script}
+        {metadata_sidebar_script}
+        {selected_run_view_script}
         {queue_run_row_script}
         {queue_script}
+        
         <script>
-            // Function to check if all component functions are ready
-            function waitForComponents(callback) {{                
-                const requiredFunctions = [
-                    'window.generateMessagesHTML',
-                    'window.generateRunName', 
-                    'window.populateSelectedRunView',
-                    'window.showErrorState'
-                ];
-                
-                const allReady = requiredFunctions.every(function(funcPath) {{
-                    const parts = funcPath.split('.');
-                    let obj = window;
-                    for (let i = 1; i < parts.length; i++) {{
-                        obj = obj[parts[i]];
-                        if (!obj) return false;
-                    }}
-                    return typeof obj === 'function';
-                }});
-
-                callback();
-            }}
-            
-            // Load data from API when page loads and components are ready
+            // Load data from API when page loads
             window.addEventListener('DOMContentLoaded', function() {{
-                waitForComponents(function() {{
-                    loadQueueData({js_queue_id}, '{js_user}', '{js_run_id_param}', {js_page_param});
-                }});
+                loadQueueData({js_queue_id}, '{js_user}', '{js_run_id_param}', {js_page_param});
             }});
         </script>
     </body>

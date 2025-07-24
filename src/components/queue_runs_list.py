@@ -77,4 +77,17 @@ def create_queue_runs_list(user, annotator_filter_html):
             </div>
         </div>
     </div>
+    
+    <!-- User Email Filter Dialog - positioned outside runs container -->
+    <div id="userEmailFilterDialog" class="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-50 hidden" style="width: 288px;">
+        <div class="p-4">
+            <div class="mb-2">
+                <label for="userEmailFilterInput" class="block text-xs font-medium text-gray-700 mb-1">User Email</label>
+                <input type="email" id="userEmailFilterInput" placeholder="Enter user email" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md mb-1" oninput="validateUserEmailFilterInput()">
+                <div id="userEmailFilterError" class="text-xs text-red-500 hidden">Please enter a valid email address</div>
+            </div>
+            <button id="applyUserEmailFilterBtn" class="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mt-2" onclick="applyUserEmailFilter()">Apply Filter</button>
+            <button id="removeUserEmailFilterBtn" class="w-full px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 mt-2" onclick="removeUserEmailFilter()" style="display: none;">Remove Filter</button>
+        </div>
+    </div>
     """

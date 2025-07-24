@@ -68,6 +68,14 @@ def queue_detail(request, queue_id: str):
     return individual_queue_page(request, queue_id)
 
 
+@app.get("/annotations")
+def annotations(request):
+    """Annotations page route - delegates to annotations page"""
+    from pages.annotations import annotations_page
+
+    return annotations_page(request)
+
+
 @app.get("/login")
 def login_page(request):
     """Login page"""
@@ -168,13 +176,20 @@ async def get_runs_api(request: Request):
         sort_by = params.get("sort_by", "timestamp")
         sort_order = params.get("sort_order", "desc")
         user_email = params.get("user_email")
+        annotator_user = params.get(
+            "annotator_user"
+        )  # New parameter for filtering by annotator
 
-        # Get current user ID for annotation filtering
+        # Get annotation filter user ID - use annotator_user if provided, otherwise current user
         annotation_filter_user_id = None
-        if annotation_filter:
-            user = get_current_user(request)
-            if user and user in VALID_USERS:
-                annotation_filter_user_id = VALID_USERS[user]["id"]
+        user = get_current_user(request)
+
+        if annotator_user and annotator_user in VALID_USERS:
+            # If specific annotator is requested, use that user's ID
+            annotation_filter_user_id = VALID_USERS[annotator_user]["id"]
+        elif annotation_filter and user and user in VALID_USERS:
+            # If judgment filter is specified but no specific annotator, use current user's ID
+            annotation_filter_user_id = VALID_USERS[user]["id"]
 
         # Support multiple values for comma-separated filters
         def parse_multi(val):

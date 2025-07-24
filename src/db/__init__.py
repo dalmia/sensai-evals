@@ -68,7 +68,7 @@ def build_run_filters(
 
     Args:
         annotation_filter: Filter by annotation status
-        annotation_filter_user_id: User ID for annotation filtering
+        annotation_filter_user_id: User ID for annotation filtering (can be current user or specific annotator)
         time_range: Time range filter
         org_ids: List of organization IDs
         course_ids: List of course IDs
@@ -85,6 +85,44 @@ def build_run_filters(
     where_conditions = []
     params = initial_params or []
 
+    # Annotation filter - filter by annotation status for specific user
+    if annotation_filter and annotation_filter_user_id:
+        if annotation_filter == "annotated" or annotation_filter == "has_annotations":
+            where_conditions.append("a.id IS NOT NULL AND a.user_id = ?")
+            params.append(annotation_filter_user_id)
+        elif (
+            annotation_filter == "unannotated" or annotation_filter == "no_annotations"
+        ):
+            where_conditions.append(
+                f"""r.id NOT IN (
+                SELECT DISTINCT run_id FROM {annotations_table_name} 
+                WHERE user_id = ?
+            )"""
+            )
+            params.append(annotation_filter_user_id)
+        elif annotation_filter == "correct":
+            where_conditions.append("a.judgement = 'correct' AND a.user_id = ?")
+            params.append(annotation_filter_user_id)
+        elif annotation_filter == "wrong":
+            where_conditions.append("a.judgement = 'wrong' AND a.user_id = ?")
+            params.append(annotation_filter_user_id)
+    elif annotation_filter_user_id and not annotation_filter:
+        # If only user_id is specified (for annotator filtering), show only runs with annotations by that user
+        where_conditions.append("a.user_id = ?")
+        params.append(annotation_filter_user_id)
+    elif annotation_filter and not annotation_filter_user_id:
+        # Original logic for any user annotations when no specific user is set
+        if annotation_filter == "annotated" or annotation_filter == "has_annotations":
+            where_conditions.append("a.id IS NOT NULL")
+        elif (
+            annotation_filter == "unannotated" or annotation_filter == "no_annotations"
+        ):
+            where_conditions.append("a.id IS NULL")
+        elif annotation_filter == "correct":
+            where_conditions.append("a.judgement = 'correct'")
+        elif annotation_filter == "wrong":
+            where_conditions.append("a.judgement = 'wrong'")
+
     # Time range filter
     if time_range:
         if time_range == "today":
@@ -95,50 +133,6 @@ def build_run_filters(
             where_conditions.append("r.start_time >= DATE('now', '-7 days')")
         elif time_range == "last30" or time_range == "last_30_days":
             where_conditions.append("r.start_time >= DATE('now', '-30 days')")
-
-    # Annotation filter - user-specific when annotation_filter_user_id is provided
-    if annotation_filter:
-        if annotation_filter_user_id:
-            # Filter annotations for specific user only
-            if (
-                annotation_filter == "annotated"
-                or annotation_filter == "has_annotations"
-            ):
-                where_conditions.append("a.id IS NOT NULL AND a.user_id = ?")
-                params.append(annotation_filter_user_id)
-            elif (
-                annotation_filter == "unannotated"
-                or annotation_filter == "no_annotations"
-            ):
-                where_conditions.append(
-                    f"""r.id NOT IN (
-                    SELECT DISTINCT run_id FROM {annotations_table_name} 
-                    WHERE user_id = ?
-                )"""
-                )
-                params.append(annotation_filter_user_id)
-            elif annotation_filter == "correct":
-                where_conditions.append("a.judgement = 'correct' AND a.user_id = ?")
-                params.append(annotation_filter_user_id)
-            elif annotation_filter == "wrong":
-                where_conditions.append("a.judgement = 'wrong' AND a.user_id = ?")
-                params.append(annotation_filter_user_id)
-        else:
-            # Original logic for any user annotations
-            if (
-                annotation_filter == "annotated"
-                or annotation_filter == "has_annotations"
-            ):
-                where_conditions.append("a.id IS NOT NULL")
-            elif (
-                annotation_filter == "unannotated"
-                or annotation_filter == "no_annotations"
-            ):
-                where_conditions.append("a.id IS NULL")
-            elif annotation_filter == "correct":
-                where_conditions.append("a.judgement = 'correct'")
-            elif annotation_filter == "wrong":
-                where_conditions.append("a.judgement = 'wrong'")
 
     # Metadata filters (support multiple values)
     def add_multi_filter(field, values, json_path):

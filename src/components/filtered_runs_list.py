@@ -1,5 +1,28 @@
-def create_filtered_runs_list(user, annotator_filter_html):
-    """Create reusable queue runs list component with filters and pagination"""
+def create_filtered_runs_list(user, annotator_filter_html, show_not_annotated=True):
+    """Create reusable queue runs list component with filters and pagination
+
+    Args:
+        user: Current user name
+        annotator_filter_html: HTML for annotator filter dropdown options
+        show_not_annotated: Whether to show "Not Annotated" option in status filter (default: True)
+    """
+
+    # Generate status filter options based on configuration
+    status_filter_options = "<button onclick=\"filterByAnnotation('all', '{user}')\" class=\"block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100\">All</button>".format(
+        user=user
+    )
+
+    if show_not_annotated:
+        status_filter_options += "<button onclick=\"filterByAnnotation('empty', '{user}')\" class=\"block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100\">Not Annotated</button>".format(
+            user=user
+        )
+
+    status_filter_options += "<button onclick=\"filterByAnnotation('correct', '{user}')\" class=\"block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100\">Correct</button>".format(
+        user=user
+    )
+    status_filter_options += "<button onclick=\"filterByAnnotation('wrong', '{user}')\" class=\"block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100\">Wrong</button>".format(
+        user=user
+    )
 
     return f"""
     <div class="w-96 bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
@@ -34,10 +57,7 @@ def create_filtered_runs_list(user, annotator_filter_html):
                         </button>
                         <div id="annotationFilterDropdown" class="absolute left-0 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-10 hidden">
                             <div class="py-1">
-                                <button onclick="filterByAnnotation('all', '{user}')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">All</button>
-                                <button onclick="filterByAnnotation('empty', '{user}')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Not Annotated</button>
-                                <button onclick="filterByAnnotation('correct', '{user}')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Correct</button>
-                                <button onclick="filterByAnnotation('wrong', '{user}')" class="block w-full text-left px-3 py-1 text-xs text-gray-700 hover:bg-gray-100">Wrong</button>
+                                {status_filter_options}
                             </div>
                         </div>
                     </div>  

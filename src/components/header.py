@@ -15,6 +15,11 @@ def create_header(user, active_tab="overview"):
         if active_tab == "queues"
         else "text-gray-500 hover:text-gray-700 pb-2"
     )
+    annotations_class = (
+        "text-blue-600 font-medium border-b-2 border-blue-600 pb-2"
+        if active_tab == "annotations"
+        else "text-gray-500 hover:text-gray-700 pb-2"
+    )
 
     return f"""
     <!-- Top Navigation with Profile -->
@@ -29,6 +34,7 @@ def create_header(user, active_tab="overview"):
                         <a href="/" class="{overview_class}">Overview</a>
                         <a href="/runs" class="{runs_class}">Runs</a>
                         <a href="/queues" class="{queues_class}">Annotation Queues</a>
+                        <a href="/annotations" class="{annotations_class}">Annotations</a>
                     </div>
                 </div>
                 

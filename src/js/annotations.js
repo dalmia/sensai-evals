@@ -1,6 +1,20 @@
 // Annotations-specific functionality for annotations page
 // Uses shared functionality from filtered_runs_list.js
 
+// Override the getAnnotationStatus function to work with transformed annotations
+const originalGetAnnotationStatus = getAnnotationStatus;
+getAnnotationStatus = function(run) {
+    // In annotations page, each "run" is actually a transformed annotation
+    // The annotation data is directly available in run.annotation
+    if (run.annotation && run.annotation.judgement) {
+        const judgement = run.annotation.judgement;
+        if (judgement === 'correct' || judgement === 'wrong') {
+            return judgement;
+        }
+    }
+    return null;
+};
+
 // Load annotations data from API
 async function loadAnnotationsData(user, selectedRunId = '') {
     currentUser = user;

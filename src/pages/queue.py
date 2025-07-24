@@ -2,7 +2,7 @@ from auth import require_auth, get_current_user, VALID_USERS
 from components.header import create_header
 from components.annotation_sidebar import create_annotation_sidebar
 from components.metadata_sidebar import create_metadata_sidebar
-from components.queue_runs_list import create_queue_runs_list
+from components.filtered_runs_list import create_filtered_runs_list
 from fasthtml.common import ScriptX
 import json
 
@@ -27,7 +27,7 @@ def individual_queue_page(request, queue_id):
     metadata_sidebar_script = ScriptX("js/components/metadata_sidebar.js")
     selected_run_view_script = ScriptX("js/components/selected_run_view.js")
     queue_script = ScriptX("js/queue.js")
-    queue_run_row_script = ScriptX("js/components/queue_run_row.js")
+    queue_run_row_script = ScriptX("js/components/filtered_run_row.js")
 
     # Get annotators from VALID_USERS
     annotators = list(VALID_USERS.keys())
@@ -62,7 +62,7 @@ def individual_queue_page(request, queue_id):
                 
                 <!-- Runs Sidebar Card -->
                 <div class="p-4 flex-shrink-0">
-                    {create_queue_runs_list(user, annotator_filter_html)}
+                    {create_filtered_runs_list(user, annotator_filter_html)}
                 </div>
             </div>
             

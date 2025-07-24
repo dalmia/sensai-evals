@@ -1,4 +1,4 @@
-def create_queue_runs_list(user, annotator_filter_html):
+def create_filtered_runs_list(user, annotator_filter_html):
     """Create reusable queue runs list component with filters and pagination"""
 
     return f"""

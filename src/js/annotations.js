@@ -234,6 +234,117 @@ function updateAnnotationsHeader() {
     }
 }
 
+// Override updateAnnotation function to work with transformed annotations
+const originalUpdateAnnotation = updateAnnotation;
+updateAnnotation = async function() {
+    const correctBtn = document.getElementById('correctBtn');
+    const wrongBtn = document.getElementById('wrongBtn');
+    const notes = document.getElementById('annotationNotes').value;
+    const updateBtn = document.getElementById('updateAnnotationBtn2');
+    
+    let judgement = null;
+    if (correctBtn && correctBtn.className.includes('bg-green-500')) {
+        judgement = 'correct';
+    } else if (wrongBtn && wrongBtn.className.includes('bg-red-500')) {
+        judgement = 'wrong';
+    }
+    
+    if (!judgement) {
+        console.error('No judgement selected');
+        return;
+    }
+    
+    // Get current run data
+    const currentRun = runsData[currentRunIndex];
+    if (!currentRun) {
+        console.error('No current run found');
+        return;
+    }
+    
+    try {
+        // Call the API to create annotation
+        const response = await fetch('/api/annotations', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                run_id: currentRun.id,
+                judgement: judgement,
+                notes: notes
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to create annotation');
+        }
+        
+        // Update the transformed annotation structure used in annotations page
+        if (currentRun.annotation) {
+            currentRun.annotation.judgement = judgement;
+            currentRun.annotation.notes = notes;
+            currentRun.annotation.created_at = new Date().toISOString();
+        }
+        
+        // Also update the original annotations structure if it exists
+        if (!currentRun.annotations) {
+            currentRun.annotations = {};
+        }
+        currentRun.annotations[currentRun.annotator] = {
+            judgement: judgement,
+            notes: notes,
+            created_at: new Date().toISOString()
+        };
+        
+        // Update original annotation state to reflect the new state
+        originalAnnotationState = {
+            judgement: judgement,
+            notes: notes
+        };
+        
+        // Update the runs display to show the new annotation status
+        updateRunsDisplay();
+        
+        // Show success message on the button
+        const originalText = 'Update annotation';
+        if (updateBtn) {
+            updateBtn.textContent = 'Updated';
+            updateBtn.className = 'w-full py-3 px-4 rounded-lg font-medium text-white mb-6 transition-colors duration-200 bg-green-600';
+            updateBtn.disabled = true;
+        }
+        
+        // Reset button state after 2 seconds
+        setTimeout(() => {
+            if (updateBtn) {
+                updateBtn.textContent = originalText;
+            }
+            updateAnnotationState();
+        }, 2000);
+        
+        console.log('Annotation updated successfully:', result);
+        
+    } catch (error) {
+        console.error('Error updating annotation:', error);
+        
+        // Show error message
+        if (updateBtn) {
+            updateBtn.textContent = 'Error';
+            updateBtn.className = 'w-full py-3 px-4 rounded-lg font-medium text-white mb-6 transition-colors duration-200 bg-red-600';
+            updateBtn.disabled = true;
+        }
+        
+        // Reset button state after 2 seconds
+        setTimeout(() => {
+            if (updateBtn) {
+                updateBtn.textContent = 'Update annotation';
+            }
+            updateAnnotationState();
+        }, 2000);
+    }
+};
+
 // Page-specific reload function called by shared filter functions
 window.reloadDataWithFilters = function() {
     loadAnnotationsData(currentUser);

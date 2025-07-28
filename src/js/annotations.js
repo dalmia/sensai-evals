@@ -18,13 +18,150 @@ getAnnotationStatus = function(run) {
 // Set page size for annotations page
 pageSize = 25;
 
+// Function to update URL with current filter state
+function updateURLWithFilters() {
+    const url = new URL(window.location);
+    
+    // Update annotator filter
+    if (selectedAnnotator && selectedAnnotator !== 'all') {
+        url.searchParams.set('annotator', selectedAnnotator);
+    } else {
+        url.searchParams.delete('annotator');
+    }
+    
+    // Update annotation status filter
+    if (currentFilter && currentFilter !== 'all') {
+        url.searchParams.set('status', currentFilter);
+    } else {
+        url.searchParams.delete('status');
+    }
+    
+    // Update email filter
+    if (currentUserEmailFilter) {
+        url.searchParams.set('email', currentUserEmailFilter);
+    } else {
+        url.searchParams.delete('email');
+    }
+    
+    // Update task title filter
+    if (currentTaskTitleFilter) {
+        url.searchParams.set('task_title', currentTaskTitleFilter);
+    } else {
+        url.searchParams.delete('task_title');
+    }
+    
+    // Update question title filter
+    if (currentQuestionTitleFilter) {
+        url.searchParams.set('question_title', currentQuestionTitleFilter);
+    } else {
+        url.searchParams.delete('question_title');
+    }
+    
+    // Don't handle page parameter here - let existing pagination system handle it
+    
+    // Update URL without reloading the page
+    window.history.pushState({}, '', url);
+}
+
+// Function to read filters from URL parameters
+function readFiltersFromURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // Read annotator filter
+    const annotatorParam = urlParams.get('annotator');
+    if (annotatorParam) {
+        selectedAnnotator = annotatorParam;
+    } else {
+        selectedAnnotator = 'all';
+    }
+    
+    // Read annotation status filter
+    const statusParam = urlParams.get('status');
+    if (statusParam) {
+        currentFilter = statusParam;
+    } else {
+        currentFilter = 'all';
+    }
+    
+    // Read email filter
+    const emailParam = urlParams.get('email');
+    if (emailParam) {
+        currentUserEmailFilter = emailParam;
+    } else {
+        currentUserEmailFilter = '';
+    }
+    
+    // Read task title filter
+    const taskTitleParam = urlParams.get('task_title');
+    if (taskTitleParam) {
+        currentTaskTitleFilter = taskTitleParam;
+    } else {
+        currentTaskTitleFilter = '';
+    }
+    
+    // Read question title filter
+    const questionTitleParam = urlParams.get('question_title');
+    if (questionTitleParam) {
+        currentQuestionTitleFilter = questionTitleParam;
+    } else {
+        currentQuestionTitleFilter = '';
+    }
+}
+
+// Override filterByAnnotator to update URL
+window.filterByAnnotator = function(annotator) {
+    selectedAnnotator = annotator;
+    updateURLWithFilters();
+    
+    // Update UI
+    const currentAnnotatorElement = document.getElementById('currentAnnotator');
+    if (currentAnnotatorElement) {
+        currentAnnotatorElement.textContent = annotator === 'all' ? 'All' : annotator;
+    }
+    
+    // Reload data with new filters
+    loadAnnotationsData(currentUser);
+};
+
+// Override filter functions to update URL (if they exist globally)
+const originalSetAnnotationFilter = window.setAnnotationFilter;
+if (originalSetAnnotationFilter) {
+    window.setAnnotationFilter = function(filter) {
+        originalSetAnnotationFilter(filter);
+        updateURLWithFilters();
+    };
+}
+
+const originalSetUserEmailFilter = window.setUserEmailFilter;
+if (originalSetUserEmailFilter) {
+    window.setUserEmailFilter = function(email) {
+        originalSetUserEmailFilter(email);
+        updateURLWithFilters();
+    };
+}
+
+const originalSetTaskTitleFilter = window.setTaskTitleFilter;
+if (originalSetTaskTitleFilter) {
+    window.setTaskTitleFilter = function(title) {
+        originalSetTaskTitleFilter(title);
+        updateURLWithFilters();
+    };
+}
+
+const originalSetQuestionTitleFilter = window.setQuestionTitleFilter;
+if (originalSetQuestionTitleFilter) {
+    window.setQuestionTitleFilter = function(title) {
+        originalSetQuestionTitleFilter(title);
+        updateURLWithFilters();
+    };
+}
+
 // Load annotations data from API
 async function loadAnnotationsData(user, selectedRunId = '') {
     currentUser = user;
-    // Set selectedAnnotator to 'all' by default if it hasn't been set yet (first load)
-    if (selectedAnnotator === '') {
-        selectedAnnotator = 'all'; 
-    }
+    
+    // Read filters from URL first
+    readFiltersFromURL();
     
     // Update the UI to show the current annotator selection
     const currentAnnotatorElement = document.getElementById('currentAnnotator');
@@ -374,5 +511,6 @@ updateAnnotation = async function() {
 
 // Page-specific reload function called by shared filter functions
 window.reloadDataWithFilters = function() {
+    updateURLWithFilters();
     loadAnnotationsData(currentUser);
 }; 

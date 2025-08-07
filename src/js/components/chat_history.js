@@ -1,7 +1,7 @@
 // Chat history specific functions - make them global
 
 // Function to generate messages HTML
-window.generateMessagesHTML = function(messages, context, questionType) {
+window.generateMessagesHTML = function(messages, context, taskType, questionType) {
     let messagesHtml = '';
     
     messages.forEach((message, index) => {
@@ -173,6 +173,15 @@ window.generateMessagesHTML = function(messages, context, questionType) {
                     '<div id="scorecard-' + index + '" class="tab-content hidden">' +
                     '<div class="space-y-4">' + scorecardHtml + '</div>' +
                     '</div>' +
+                    '</div>' +
+                    '</div>';
+            } else if (taskType === 'learning_material' && typeof content === 'object' && content !== null && content.response) {
+                // Handle learning material responses with pretty formatting
+                const response = content.response || '';
+                messagesHtml += '<div class="mb-6">' +
+                    '<div class="bg-gray-50 border border-gray-200 p-4 rounded-lg w-full">' +
+                    '<div class="text-sm font-medium text-gray-700 mb-2">Assistant</div>' +
+                    '<div class="text-sm text-gray-900 whitespace-pre-wrap">' + response + '</div>' +
                     '</div>' +
                     '</div>';
             } else {

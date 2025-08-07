@@ -80,6 +80,7 @@ window.createSelectedRunViewHTML = function(selectedRun, metadataSidebarOpen, an
     const runName = generateRunName(selectedRun);
     const context = selectedRun.metadata?.context || '';
     const messages = selectedRun.messages || [];
+    const taskType = selectedRun.metadata?.type || '';
     const questionType = selectedRun.metadata?.question_type || '';
     
     // Generate button classes
@@ -96,8 +97,7 @@ window.createSelectedRunViewHTML = function(selectedRun, metadataSidebarOpen, an
     let messagesHtml = '';
     
     // Generate messages HTML using the chat history component
-    console.log(window.generateMessagesHTML)
-    messagesHtml = window.generateMessagesHTML(messages, context, questionType);
+    messagesHtml = window.generateMessagesHTML(messages, context, taskType,questionType);
     
     return '<div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden flex flex-col" style="height: calc(100vh - 120px);">' +
         '<div class="border-b border-gray-200 px-6 py-4 flex-shrink-0">' +
